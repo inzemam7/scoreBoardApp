@@ -4,7 +4,7 @@
     "slug": "scoreBoardApp",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",//change this later
+    "icon": "./assets/images/iconimg.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,7 +13,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",//change this later
+        "foregroundImage": "./assets/images/iconimg.png",//change this later
         "backgroundColor": "#ffffff"//this as well
       }
     },
@@ -27,10 +27,11 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",//splash change as well
+          // "image": "./assets/images/spalsh.mp4",//splash change as 
+          "adaptiveIcon":"./assets/images/spalsh.mp4",//splash change as
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "golden"
         }
       ]
     ],
