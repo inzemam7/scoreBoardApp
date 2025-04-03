@@ -7,6 +7,11 @@
     "icon": "./assets/images/iconimg.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "assets/images/iconimg.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#fee871"
+    },
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
@@ -27,11 +32,11 @@
       [
         "expo-splash-screen",
         {
-          // "image": "./assets/images/spalsh.mp4",//splash change as 
-          "adaptiveIcon":"./assets/images/spalsh.mp4",//splash change as
-          "imageWidth": 200,
+          "image": "./assets/images/iconimg.png",//splash change as 
+          // "adaptiveIcon":"./assets/images/splash-icon.png",//splash change as
+          "imageWidth": 400,
           "resizeMode": "contain",
-          "backgroundColor": "golden"
+          "backgroundColor": "#333"
         }
       ]
     ],

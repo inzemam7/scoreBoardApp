@@ -36,7 +36,9 @@ export default function RootLayout() {
    <>
     <Stack screenOptions={{headerStyle : {backgroundColor: theme.headerBackground},headerTintColor: theme.text, headerShadowVisible: false}}>
         <Stack.Screen name='index' options={{title:"Home", headerShown: false}}/>
-        <Stack.Screen name='About Us' options={{title:"About Us"}}/>
+        <Stack.Screen name='cricket' options={{title:"Cricket", headerShown: false}}/>
+        <Stack.Screen name='football' options={{title:"Football", headerShown: false}}/>
+        <Stack.Screen name='About Us' options={{title:"About Us", headerShown: false}}/>
         <Stack.Screen name="+not-found" />
     </Stack>
     <StatusBar style="auto" />
