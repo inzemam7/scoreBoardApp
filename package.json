@@ -1,4 +1,4 @@
-{
+npx expo start{
   "name": "scoreboardapp",
   "main": "expo-router/entry",
   "version": "1.0.0",
