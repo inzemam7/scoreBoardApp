@@ -56,5 +56,5 @@ const styles = StyleSheet.create({
     margin: "auto",
     borderRadius: 50,
     paddingBlockStart: "auto",
-  },
+  }
 });
