@@ -1,49 +1,54 @@
-import { View, Text, StyleSheet } from 'react-native';
+
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Link } from 'expo-router';
 
 const Cricket = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Cricket</Text>
-
+      <Link href="/cricTournamentSetup" asChild>
+        <TouchableOpacity style={styles.button}>
+          <Text style={styles.buttonText}>Tournament</Text>
+        </TouchableOpacity>
+      </Link>
       <Link href="/cricSingle" asChild>
-        <Text style={styles.Link}>One-off Match</Text>
+      <TouchableOpacity style={styles.button}>
+        <Text style={styles.buttonText}>One-Off Match</Text>
+      </TouchableOpacity>
       </Link>
 
-      <Link href="/cricTournament" asChild>
-        <Text style={styles.Link}>Tournament</Text>
-      </Link>
     </View>
   );
 };
 
 export default Cricket;
 
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: "center",
-    flexDirection: "column",
-    backgroundColor: "lightyellow",
+    backgroundColor: 'lightyellow',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
-    fontSize: 60,
-    fontWeight: "bold",
-    margin: 'auto',
+    color: 'gold',
+    fontSize: 50,
+    fontWeight: 'bold',
+    marginBottom: 80,
   },
-  Link: {
-    color: "white",
-    fontSize: 35,
-    fontWeight: "bold",
-    textAlign: "center",
-    backgroundColor: "#333",
-    marginTop: "0",
-    marginBlockEnd: "90",
-    height: "auto",
-    width: 300,
-    margin: "auto",
+  button: {
+    backgroundColor: '#333',
+    paddingVertical: 15,
+    paddingHorizontal: 30,
     borderRadius: 50,
-    paddingBlockStart: "auto",
-  }
+    marginBottom: 30,
+    width: 300,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 35,
+    fontWeight: 'bold',
+  },
 });
