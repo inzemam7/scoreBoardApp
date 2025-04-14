@@ -69,7 +69,7 @@ const Fixtures = () => {
     });
 
     if (winners.length === 1) {
-      Alert.alert(`🏆 ${teamNames[winners[0]]} wins the tournament!`);
+      Alert.alert(`${teamNames[winners[0]]} wins the tournament!`);
       setRound(1);
       setCurrentTeams(Object.keys(teamPlayers)); // Restart tournament
     } else {
@@ -100,7 +100,16 @@ const Fixtures = () => {
               style={styles.matchButton}
               onPress={() => {
                 // Navigate to match screen and pass teams
-                router.push({ pathname: '/matchScreen', query: { teamA, teamB } });
+                router.push({
+                  pathname: '/matchScreen',
+                  params: {
+                    teamA: teamNames[teamA],
+                    teamB: teamNames[teamB],
+                    matchNumber: round, // Pass the match number
+                    // tossWinner: null,  // Remove tossWinner.  It is determined in MatchScreen
+                    // tossDecision: null, // Remove tossDecision. It is determined in MatchScreen
+                  },
+                });
               }}
             >
               <Text style={styles.buttonText}>Start Match</Text>
@@ -111,7 +120,7 @@ const Fixtures = () => {
       {fixtures.length > 0 && (
         <View style={styles.buttonContainer}>
           <TouchableOpacity style={styles.matchButton} onPress={simulateWinners}>
-            <Text style={styles.buttonText}>Simulate Winners → Next Round</Text>
+            <Text style={styles.buttonText}>Simulate Winners - Next Round</Text>
           </TouchableOpacity>
         </View>
       )}
