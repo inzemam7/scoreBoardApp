@@ -53,6 +53,7 @@ const MatchScreen = () => {
       return;
     }
     const winnerTeam = Math.random() < 0.5 ? teamA : teamB;
+    console.log('Toss Winner Selected:', winnerTeam); // debug
     setTossWinner(winnerTeam);
   };
 
@@ -214,7 +215,7 @@ const MatchScreen = () => {
         </Text>
       </View>
 
-      {!tossWinner ? (
+      {tossWinner === null ? (
         <TouchableOpacity style={styles.tossButton} onPress={handleToss}>
           <Text style={styles.buttonText}>Start Match</Text>
         </TouchableOpacity>
