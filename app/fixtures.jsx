@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Button } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Button, Alert, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 
@@ -10,20 +10,34 @@ const Fixtures = () => {
   const [currentTeams, setCurrentTeams] = useState([]);
   const [round, setRound] = useState(1);
   const router = useRouter();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
-      const playersData = await AsyncStorage.getItem('teamPlayers');
-      const namesData = await AsyncStorage.getItem('teamNamesInput');
+      try {
+        const playersData = await AsyncStorage.getItem('teamPlayers');
+        const namesData = await AsyncStorage.getItem('teamNamesInput');
 
-      if (playersData && namesData) {
-        const parsedPlayers = JSON.parse(playersData);
-        const parsedNames = JSON.parse(namesData);
-        setTeamPlayers(parsedPlayers);
-        setTeamNames(parsedNames);
-        setCurrentTeams(Object.keys(parsedPlayers));
+        // Debugging logs
+        console.log("Retrieved playersData:", playersData);
+        console.log("Retrieved namesData:", namesData);
+
+        if (playersData && namesData) {
+          const parsedPlayers = JSON.parse(playersData);
+          const parsedNames = JSON.parse(namesData);
+          setTeamPlayers(parsedPlayers);
+          setTeamNames(parsedNames);
+          setCurrentTeams(Object.keys(parsedPlayers));
+        } else {
+          Alert.alert('Error', 'Could not load teams data. Please check if the data is saved properly.');
+        }
+      } catch (error) {
+        Alert.alert('Error', 'Error fetching team data: ' + error.message);
+      } finally {
+        setLoading(false); // Set loading to false after data fetch
       }
     }
+
     fetchData();
   }, []);
 
@@ -50,12 +64,12 @@ const Fixtures = () => {
 
   const simulateWinners = () => {
     const winners = fixtures.map(([teamA, teamB]) => {
-      if (!teamB) return teamA; // bye
-      return Math.random() < 0.5 ? teamA : teamB;
+      if (!teamB) return teamA; // Bye
+      return Math.random() < 0.5 ? teamA : teamB; // Simulate winner
     });
 
     if (winners.length === 1) {
-      alert(`🏆 ${teamNames[winners[0]]} wins the tournament!`);
+      Alert.alert(`🏆 ${teamNames[winners[0]]} wins the tournament!`);
       setRound(1);
       setCurrentTeams(Object.keys(teamPlayers)); // Restart tournament
     } else {
@@ -64,28 +78,41 @@ const Fixtures = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="white" />
+        <Text style={styles.loadingText}>Loading fixtures...</Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Round {round} Fixtures</Text>
       {fixtures.map(([teamA, teamB], index) => (
-        <View style={styles.fixtureCard} key={index}>
+        <View style={styles.fixtureCard} key={`${teamA}-${teamB}`}>
           <Text style={styles.fixtureText}>
             {teamNames[teamA]} vs {teamB ? teamNames[teamB] : 'BYE'}
           </Text>
-          <TouchableOpacity
-            style={styles.matchButton}
-            onPress={() => {
-              // Navigate to match screen and pass teams
-              router.push({ pathname: '/matchScreen', params: { teamA, teamB } });
-            }}
-          >
-            <Text style={styles.buttonText}>Start Match</Text>
-          </TouchableOpacity>
+          {teamA && teamB && (
+            <TouchableOpacity
+              style={styles.matchButton}
+              onPress={() => {
+                // Navigate to match screen and pass teams
+                router.push({ pathname: '/matchScreen', query: { teamA, teamB } });
+              }}
+            >
+              <Text style={styles.buttonText}>Start Match</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ))}
       {fixtures.length > 0 && (
         <View style={styles.buttonContainer}>
-          <Button title="Simulate Winners → Next Round" onPress={simulateWinners} />
+          <TouchableOpacity style={styles.matchButton} onPress={simulateWinners}>
+            <Text style={styles.buttonText}>Simulate Winners → Next Round</Text>
+          </TouchableOpacity>
         </View>
       )}
     </ScrollView>
@@ -127,6 +154,16 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     marginTop: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#222',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: 'white',
   },
 });
 

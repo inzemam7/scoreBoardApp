@@ -18,7 +18,7 @@ const cricTournamentSetup = () => {
       return; // Stop the function from proceeding
     }
 
-    await AsyncStorage.setItem('tournamentSetup', JSON.stringify({ overs, teams }));
+    await AsyncStorage.setItem('cricTournamentSetup', JSON.stringify({ overs, teams }));
     router.push('/teamSetup');
   };
 

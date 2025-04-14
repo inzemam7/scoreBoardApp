@@ -28,7 +28,7 @@ const MatchScreen = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const tournamentData = await AsyncStorage.getItem('tournamentSetup');
+        const tournamentData = await AsyncStorage.getItem('cricTournamentSetup');
         if (tournamentData) {
           const parsed = JSON.parse(tournamentData);
           setOversLimit(parseInt(parsed.overs));
