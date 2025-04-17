@@ -29,7 +29,6 @@ const FootballFixtures = () => {
         const shuffledTeams = shuffleArray(teams);
         const pairs = [];
 
-        // Create pairs for the knockout round
         for (let i = 0; i < shuffledTeams.length; i += 2) {
           if (shuffledTeams[i + 1]) {
             pairs.push({
@@ -51,7 +50,7 @@ const FootballFixtures = () => {
       pathname: '/footballMatchscreen',
       params: {
         match: JSON.stringify(match),
-        duration: matchDuration,
+        duration: matchDuration.toString(),
       },
     });
   };

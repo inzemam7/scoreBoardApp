@@ -35,16 +35,16 @@ const styles = StyleSheet.create({
   },
   Text: {
     color: "white",
-    fontSize: 50,
+    fontSize: 70,
     fontWeight: "bold",
     textAlign: "center",
     backgroundColor: "gold",
     marginBottom: 50, // Adjusting bottom margin
-    height: 150, // Reduced height for better appearance
-    width: "80%", // Using percentage width to make it more responsive
+    height: 140, // Reduced height for better appearance
+    width: "90%", // Using percentage width to make it more responsive
     borderRadius: 60,
     justifyContent: "center", // Centering text vertically inside the box
-    paddingVertical: 50, // Padding to center the text vertically
+    padding: 10, // Padding to center the text vertically
   },
   Link: {
     marginTop: 15, // Adding margin to space out the links
