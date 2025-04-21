@@ -9,16 +9,25 @@ const FootballTournamentSetup = () => {
   const router = useRouter();
 
   const handleSetup = async () => {
+    const numDuration = parseInt(matchDuration);
+    const numTeams = parseInt(teams);
+
     if (!matchDuration || !teams) {
-      Alert.alert(
-        'Missing Info',
-        'Please fill all fields including match duration and number of teams.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Missing Info', 'Please fill in all fields.', [{ text: 'OK' }]);
       return;
     }
 
-    await AsyncStorage.setItem('footballTournamentSetup', JSON.stringify({ matchDuration, teams }));
+    if (isNaN(numDuration) || numDuration <= 0) {
+      Alert.alert('Invalid Duration', 'Please enter a valid match duration in minutes.', [{ text: 'OK' }]);
+      return;
+    }
+
+    if (isNaN(numTeams) || numTeams < 2 || numTeams % 2 !== 0) {
+      Alert.alert('Invalid Teams', 'Please enter an even number of teams (minimum 2) for a knockout tournament.', [{ text: 'OK' }]);
+      return;
+    }
+
+    await AsyncStorage.setItem('footballTournamentSetup', JSON.stringify({ matchDuration: numDuration, teams: numTeams }));
     router.push('/footballTeamSetup');
   };
 
