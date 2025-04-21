@@ -1,20 +1,12 @@
-import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Button,
-  Alert,
-  ScrollView,
-} from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import RNPickerSelect from "react-native-picker-select";
+// All imports stay the same
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Button, Alert, ScrollView } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const MatchScreen = () => {
-    const params = useLocalSearchParams();
-    const { teamA, teamB, matchNumber, tossWinner: passedTossWinner, isViewOnly, matchData, isSingleMatch } = params;
+    const { teamA, teamB, matchNumber, tossWinner: passedTossWinner, isViewOnly, matchData } = useLocalSearchParams();
+
     const router = useRouter();
 
     const [tossWinner, setTossWinner] = useState(null);
@@ -24,8 +16,6 @@ const MatchScreen = () => {
     const [bowlingTeam, setBowlingTeam] = useState(null);
     const [teamAName, setTeamAName] = useState(teamA);
     const [teamBName, setTeamBName] = useState(teamB);
-    const [returnPath] = useState(isSingleMatch === 'true' ? '/cricSingle' : '/fixtures');
-    const [historyKey] = useState(isSingleMatch === 'true' ? 'singleMatchHistory' : 'matchHistory');
 
     const [inningsData, setInningsData] = useState([
         { score: 0, wickets: 0, balls: 0, history: [] },
@@ -36,6 +26,7 @@ const MatchScreen = () => {
     const [isMatchOver, setIsMatchOver] = useState(false);
     const [target, setTarget] = useState(null);
     const [winner, setWinner] = useState(null);
+    
 
     useEffect(() => {
         const fetchData = async () => {
@@ -125,6 +116,10 @@ const MatchScreen = () => {
 
     const saveMatchToHistory = async (matchData) => {
         try {
+            // Check if it's a single match
+            const params = useLocalSearchParams();
+            const historyKey = params.isSingleMatch === 'true' ? 'singleMatchHistory' : 'matchHistory';
+            
             const historyJSON = await AsyncStorage.getItem(historyKey);
             const history = historyJSON ? JSON.parse(historyJSON) : [];
     
@@ -169,6 +164,9 @@ const MatchScreen = () => {
             teamBWickets: currentInning === 1 ? inningsData[1].wickets : inningsData[0].wickets
         };
     
+        const isSingleMatch = useLocalSearchParams().isSingleMatch === 'true';
+        const returnPath = isSingleMatch ? '/cricSingle' : '/fixtures';
+
         Alert.alert(
             '🏆 Match Over',
             matchWinner === 'Tie' ? "It's a tie!" : `${matchWinner} wins!\n\nDo you want to save this match to history?`,
@@ -188,34 +186,25 @@ const MatchScreen = () => {
             ]
         );
     };
+    
+    
 
     const updateBall = (runs, extra = false, isWicket = false) => {
         if (isMatchOver) return;
 
         const newData = [...inningsData];
         const inningIndex = currentInning - 1;
-        const historyEntry = { type: '', runs: 0, isExtra: extra };
+        const historyEntry = { type: '', runs: 0 };
 
         if (isWicket) {
             newData[inningIndex].wickets += 1;
-            if (!extra) {
-                newData[inningIndex].balls += 1;
-            }
+            newData[inningIndex].balls += 1;
             historyEntry.type = 'wicket';
-            historyEntry.runs = 0;
         } else {
             newData[inningIndex].score += runs;
-            if (extra) {
-                historyEntry.type = runs >= 5 ? 'no-ball' : 'wide';
-                const extraRun = 1;
-                newData[inningIndex].score += extraRun;
-                historyEntry.runs = runs;
-                historyEntry.extraRun = extraRun;
-            } else {
-                historyEntry.type = 'run';
-                historyEntry.runs = runs;
-                newData[inningIndex].balls += 1;
-            }
+            historyEntry.type = extra ? 'extra' : 'run';
+            historyEntry.runs = runs;
+            if (!extra) newData[inningIndex].balls += 1;
         }
 
         newData[inningIndex].history.push(historyEntry);
@@ -226,12 +215,10 @@ const MatchScreen = () => {
         const isAllOut = wickets >= 10;
         const isOversCompleted = balls >= maxBalls;
 
-        if (currentInning === 2) {
-            if (score >= target) {
-                setInningsData(newData);
-                endMatch(battingTeam);
-                return;
-            }
+        if (currentInning === 2 && score >= target) {
+            setInningsData(newData);
+            endMatch(battingTeam);
+            return;
         }
 
         if (isOversCompleted || isAllOut) {
@@ -239,13 +226,10 @@ const MatchScreen = () => {
             if (currentInning === 1) {
                 startSecondInnings(isAllOut);
             } else {
-                if (score < target - 1) {
-                    endMatch(bowlingTeam);
-                } else if (score === target - 1) {
-                    endMatch('Tie');
-                } else {
-                    endMatch(battingTeam);
-                }
+                const team1Score = inningsData[0].score;
+                const team2Score = newData[1].score;
+                const matchWinner = team2Score > team1Score ? battingTeam : team2Score < team1Score ? bowlingTeam : 'Tie';
+                endMatch(matchWinner);
             }
             return;
         }
@@ -258,328 +242,177 @@ const MatchScreen = () => {
 
         const newData = [...inningsData];
         const inningIndex = currentInning - 1;
-        const lastBall = newData[inningIndex].history.pop();
+        const history = newData[inningIndex].history;
 
-        if (!lastBall) return;
+        if (history.length === 0) {
+            Alert.alert('No action to undo');
+            return;
+        }
 
-        if (lastBall.type === 'wicket') {
+        const last = history.pop();
+
+        if (last.type === 'run') {
+            newData[inningIndex].score -= last.runs;
+            newData[inningIndex].balls -= 1;
+        } else if (last.type === 'extra') {
+            newData[inningIndex].score -= last.runs;
+        } else if (last.type === 'wicket') {
             newData[inningIndex].wickets -= 1;
-            if (!lastBall.isExtra) {
-                newData[inningIndex].balls -= 1;
-            }
-        } else {
-            newData[inningIndex].score -= lastBall.runs;
-            if (lastBall.extraRun) {
-                newData[inningIndex].score -= lastBall.extraRun;
-            }
-            if (!lastBall.isExtra) {
-                newData[inningIndex].balls -= 1;
-            }
+            newData[inningIndex].balls -= 1;
         }
 
         setInningsData(newData);
     };
 
+    const currentData = inningsData[currentInning - 1];
+    const overs = Math.floor(currentData.balls / 6);
+    const currentBall = currentData.balls % 6;
+
     const renderInningsSummary = () => {
-        const currentInningData = inningsData[currentInning - 1];
-        const overs = Math.floor(currentInningData.balls / 6);
-        const balls = currentInningData.balls % 6;
+        const team1 = teamAName;
+        const team2 = teamBName;
+
+        const firstInningData = inningsData[0];
+        const secondInningData = inningsData[1];
+
+        const firstInningBatting = currentInning === 1 ? battingTeam : bowlingTeam;
+        const secondInningBatting = currentInning === 2 ? battingTeam : bowlingTeam;
 
         return (
-            <View style={styles.summaryContainer}>
-                <Text style={styles.summaryText}>
-                    {battingTeam} {currentInningData.score}/{currentInningData.wickets}
-                </Text>
-                <Text style={styles.oversText}>
-                    Overs: {overs}.{balls} / {oversLimit}
-                </Text>
-                {currentInning === 2 && target && (
-                    <Text style={styles.targetText}>
-                        Target: {target} ({target - currentInningData.score} needed from {(oversLimit * 6) - currentInningData.balls} balls)
+            <View style={styles.inningsRow}>
+                <View style={styles.inningsBox}>
+                    <Text style={styles.inningsTeam}>{firstInningBatting === teamAName ? team1 : team2}</Text>
+                    <Text style={styles.inningsScore}>
+                        {firstInningData.balls === 0 && currentInning === 2
+                            ? 'Yet to bat'
+                            : `${firstInningData.score}/${firstInningData.wickets} (${Math.floor(firstInningData.balls / 6)}.${firstInningData.balls % 6} ov)`}
                     </Text>
-                )}
+                </View>
+                <View style={styles.inningsBox}>
+                    <Text style={styles.inningsTeam}>{secondInningBatting === teamAName ? team1 : team2}</Text>
+                    <Text style={styles.inningsScore}>
+                        {secondInningData.balls === 0 && currentInning === 1
+                            ? 'Yet to bat'
+                            : `${secondInningData.score}/${secondInningData.wickets} (${Math.floor(secondInningData.balls / 6)}.${secondInningData.balls % 6} ov)`}
+                    </Text>
+                </View>
             </View>
         );
     };
 
     return (
         <ScrollView style={styles.container}>
-            {!isViewOnly && (
+            <View style={styles.header}>
+                <Text style={styles.title}>
+                    {isViewOnly ? '📜 Match Details' :
+                     matchNumber === '3' ? '🏆 Final' : 
+                     matchNumber === '2' ? '🎯 Semi-Final' : 
+                     '🏏 Match - ' + (matchNumber || 1)}
+                </Text>
+                <Text style={styles.teams}>
+                    {teamAName} vs {teamBName}
+                </Text>
+            </View>
+
+            {isViewOnly ? (
                 <>
-                    {!tossWinner ? (
-                        <TouchableOpacity style={styles.tossButton} onPress={handleToss}>
-                            <Text style={styles.buttonText}>Conduct Toss</Text>
-                        </TouchableOpacity>
-                    ) : !tossDecision ? (
-                        <View style={styles.decisionContainer}>
-                            <Text style={styles.tossText}>{tossWinner} won the toss</Text>
-                            <View style={styles.decisionButtons}>
-                                <TouchableOpacity
-                                    style={styles.decisionButton}
-                                    onPress={() => handleDecision('bat')}
-                                >
-                                    <Text style={styles.buttonText}>Bat</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={styles.decisionButton}
-                                    onPress={() => handleDecision('bowl')}
-                                >
-                                    <Text style={styles.buttonText}>Bowl</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    ) : (
-                        <>
-                            {renderInningsSummary()}
-                            <View style={styles.scoreButtons}>
-                                {[0, 1, 2, 3, 4, 6].map((runs) => (
-                                    <TouchableOpacity
-                                        key={runs}
-                                        style={styles.runButton}
-                                        onPress={() => updateBall(runs)}
-                                    >
-                                        <Text style={styles.buttonText}>{runs}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                            <View style={styles.extraOptionsContainer}>
-                                <View style={styles.extraOptionSection}>
-                                    <Text style={styles.extraOptionTitle}>Wide Ball</Text>
-                                    <RNPickerSelect
-                                        onValueChange={(value) => value && updateBall(value, true)}
-                                        placeholder={{ label: "Wide + ", value: null }}
-                                        items={[
-                                            { label: "Wide + 0", value: 1 },
-                                            { label: "Wide + 1", value: 2 },
-                                            { label: "Wide + 2", value: 3 },
-                                            { label: "Wide + 4", value: 5 },
-                                        ]}
-                                        style={pickerSelectStyles}
-                                    />
-                                </View>
-                                <View style={styles.extraOptionSection}>
-                                    <Text style={styles.extraOptionTitle}>No Ball</Text>
-                                    <RNPickerSelect
-                                        onValueChange={(value) => value && updateBall(value, true)}
-                                        placeholder={{ label: "No Ball + ", value: null }}
-                                        items={[
-                                            { label: "No Ball + 0", value: 1 },
-                                            { label: "No Ball + 1", value: 2 },
-                                            { label: "No Ball + 2", value: 3 },
-                                            { label: "No Ball + 4", value: 5 },
-                                            { label: "No Ball + 6", value: 7 },
-                                        ]}
-                                        style={pickerSelectStyles}
-                                    />
-                                </View>
-                                <View style={styles.extraOptionSection}>
-                                    <Text style={styles.extraOptionTitle}>Leg Bye</Text>
-                                    <RNPickerSelect
-                                        onValueChange={(value) => value && updateBall(value)}
-                                        placeholder={{ label: "Leg Bye", value: null }}
-                                        items={[
-                                            { label: "Leg Bye 1", value: 1 },
-                                            { label: "Leg Bye 2", value: 2 },
-                                            { label: "Leg Bye 3", value: 3 },
-                                            { label: "Leg Bye 4", value: 4 },
-                                        ]}
-                                        style={pickerSelectStyles}
-                                    />
-                                </View>
-                            </View>
-                            <View style={styles.extraButtons}>
-                                <TouchableOpacity
-                                    style={styles.extraButton}
-                                    onPress={() => updateBall(0, false, true)}
-                                >
-                                    <Text style={styles.buttonText}>Wicket</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={styles.extraButton}
-                                    onPress={undoLastBall}
-                                >
-                                    <Text style={styles.buttonText}>Undo</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </>
-                    )}
+                    <Text style={styles.tossResult}>
+                        {tossWinner} won the toss and chose to {tossDecision}
+                    </Text>
+                    {renderInningsSummary()}
+                    <Text style={[styles.winnerText, { marginTop: 20 }]}>
+                        {winner === 'Tie' ? "Match Tied!" : `${winner} won the match!`}
+                    </Text>
                 </>
-            )}
-            {isViewOnly && (
-                <View style={styles.matchSummary}>
-                    <Text style={styles.summaryTitle}>Match Summary</Text>
-                    <Text style={styles.summaryText}>
-                        {teamAName} vs {teamBName}
+            ) : tossWinner === null ? (
+                <TouchableOpacity style={styles.tossButton} onPress={handleToss}>
+                    <Text style={styles.buttonText}>🎯 Toss</Text>
+                </TouchableOpacity>
+            ) : !tossDecision ? (
+                <>
+                    <Text style={styles.tossResult}>
+                        {tossWinner} won the toss
                     </Text>
-                    <Text style={styles.summaryText}>
-                        Winner: {winner}
+                    <Text style={styles.chooseText}>Choose to bat or bowl</Text>
+                    <View style={styles.actions}>
+                        <Button title="Bat" onPress={() => handleDecision('bat')} />
+                        <Button title="Bowl" onPress={() => handleDecision('bowl')} />
+                    </View>
+                </>
+            ) : (
+                <>
+                    <Text style={styles.tossResult}>
+                        {tossWinner} won the toss and chose to {tossDecision}
                     </Text>
-                    <Text style={styles.summaryText}>
-                        Toss: {tossWinner} won and chose to {tossDecision}
+                    <Text style={styles.inningText}>
+                        {currentInning === 1
+                            ? `1st Inning - ${battingTeam} Batting`
+                            : `2nd Inning - ${battingTeam} Batting`}
                     </Text>
-                    <View style={styles.inningsSummary}>
-                        <Text style={styles.inningsTitle}>First Innings</Text>
-                        <Text style={styles.inningsText}>
-                            {inningsData[0].score}/{inningsData[0].wickets} ({Math.floor(inningsData[0].balls / 6)}.{inningsData[0].balls % 6} overs)
+
+                    {currentInning === 2 && target && (
+                        <Text style={styles.targetText}>🎯 Target: {target}</Text>
+                    )}
+
+                    {renderInningsSummary()}
+
+                    <View style={styles.scoreBoard}>
+                        <Text style={styles.scoreText}>
+                            Score: {currentData.score}/{currentData.wickets}
                         </Text>
-                        <Text style={styles.inningsTitle}>Second Innings</Text>
-                        <Text style={styles.inningsText}>
-                            {inningsData[1].score}/{inningsData[1].wickets} ({Math.floor(inningsData[1].balls / 6)}.{inningsData[1].balls % 6} overs)
+                        <Text style={styles.scoreText}>
+                            Overs: {overs}.{currentBall} / {oversLimit}
                         </Text>
                     </View>
-                </View>
+
+                    <Text style={styles.chooseText}>Choose Outcome:</Text>
+                    <View style={styles.actionsWrap}>
+                        <Button title="Dot" onPress={() => updateBall(0)} />
+                        <Button title="1" onPress={() => updateBall(1)} />
+                        <Button title="2" onPress={() => updateBall(2)} />
+                        <Button title="3" onPress={() => updateBall(3)} />
+                        <Button title="4" onPress={() => updateBall(4)} />
+                        <Button title="5" onPress={() => updateBall(5)} />
+                        <Button title="6" onPress={() => updateBall(6)} />
+                        <Button title="Wide" color="purple" onPress={() => updateBall(1, true)} />
+                        <Button title="No Ball" color="orange" onPress={() => updateBall(1, true)} />
+                        <Button title="Leg Bye" color="#999" onPress={() => updateBall(1, true)} />
+                        <Button title="Wicket" color="red" onPress={() => updateBall(0, false, true)} />
+                        <Button title="Undo" color="#ffcc00" onPress={undoLastBall} />
+                    </View>
+                </>
             )}
         </ScrollView>
     );
 };
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        padding: 20,
-        backgroundColor: '#222',
-    },
-    tossButton: {
-        backgroundColor: '#444',
-        padding: 15,
-        borderRadius: 8,
-        marginBottom: 20,
-    },
-    decisionContainer: {
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    tossText: {
-        color: 'white',
-        fontSize: 18,
-        marginBottom: 10,
-    },
-    decisionButtons: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        width: '100%',
-    },
-    decisionButton: {
-        backgroundColor: '#444',
-        padding: 15,
-        borderRadius: 8,
-        width: '45%',
-    },
-    buttonText: {
-        color: 'white',
-        textAlign: 'center',
-        fontSize: 16,
-    },
-    summaryContainer: {
-        backgroundColor: '#333',
-        padding: 15,
-        borderRadius: 8,
-        marginBottom: 20,
-    },
-    summaryText: {
-        color: 'white',
-        fontSize: 20,
-        marginBottom: 5,
-    },
-    oversText: {
-        color: '#aaa',
-        fontSize: 16,
-    },
-    targetText: {
-        color: '#4CAF50',
-        fontSize: 16,
-        marginTop: 5,
-    },
-    scoreButtons: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        marginBottom: 20,
-    },
-    runButton: {
-        backgroundColor: '#444',
-        padding: 20,
-        borderRadius: 8,
-        width: '30%',
-        marginBottom: 10,
-    },
-    extraButtons: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    extraButton: {
-        backgroundColor: '#444',
-        padding: 15,
-        borderRadius: 8,
-        width: '30%',
-    },
-    matchSummary: {
-        backgroundColor: '#333',
-        padding: 20,
-        borderRadius: 8,
-    },
-    summaryTitle: {
-        color: 'white',
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginBottom: 15,
-    },
-    inningsSummary: {
-        marginTop: 15,
-    },
-    inningsTitle: {
-        color: '#4CAF50',
-        fontSize: 18,
-        marginTop: 10,
-        marginBottom: 5,
-    },
-    inningsText: {
-        color: 'white',
-        fontSize: 16,
-    },
-    extraOptionsContainer: {
-        backgroundColor: '#333',
-        padding: 15,
-        borderRadius: 8,
-        marginBottom: 20,
-    },
-    extraOptionSection: {
-        marginBottom: 15,
-    },
-    extraOptionTitle: {
-        color: 'white',
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginBottom: 8,
-    },
-});
-
-const pickerSelectStyles = {
-    inputIOS: {
-        fontSize: 16,
-        paddingVertical: 12,
-        paddingHorizontal: 10,
-        borderWidth: 1,
-        borderColor: '#444',
-        borderRadius: 8,
-        color: 'white',
-        backgroundColor: '#444',
-        paddingRight: 30,
-    },
-    inputAndroid: {
-        fontSize: 16,
-        paddingHorizontal: 10,
-        paddingVertical: 8,
-        borderWidth: 1,
-        borderColor: '#444',
-        borderRadius: 8,
-        color: 'white',
-        backgroundColor: '#444',
-        paddingRight: 30,
-    },
-    placeholder: {
-        color: '#aaa',
-    },
-};
-
 export default MatchScreen;
+
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#222', padding: 20 },
+  header: { alignItems: 'center', marginBottom: 20 },
+  title: { fontSize: 24, fontWeight: 'bold', color: 'gold', marginBottom: 5 },
+  teams: { fontSize: 18, color: 'white', marginBottom: 10 },
+  tossButton: {
+    backgroundColor: '#444',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  tossResult: { fontSize: 16, color: 'lightgreen', marginBottom: 10, textAlign: 'center' },
+  inningText: { fontSize: 16, color: 'skyblue', textAlign: 'center', marginBottom: 10 },
+  targetText: { fontSize: 18, color: 'gold', textAlign: 'center', marginBottom: 10 },
+  chooseText: { fontSize: 16, color: '#ccc', marginVertical: 10, textAlign: 'center' },
+  scoreBoard: { backgroundColor: '#333', padding: 20, borderRadius: 10, marginBottom: 20 },
+  scoreText: { color: 'white', fontSize: 18, marginBottom: 5 },
+  actions: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: 10, flexWrap: 'wrap' },
+  actionsWrap: { flexWrap: 'wrap', flexDirection: 'row', justifyContent: 'space-between', rowGap: 10, columnGap: 10, marginBottom: 20 },
+  buttonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
+  inningsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
+  inningsBox: { flex: 1, backgroundColor: '#333', padding: 15, borderRadius: 10, marginHorizontal: 5, alignItems: 'center' },
+  inningsTeam: { fontSize: 16, fontWeight: 'bold', color: 'lightblue', marginBottom: 5 },
+  inningsScore: { fontSize: 16, color: 'white' },
+  winnerText: { fontSize: 18, color: 'gold', textAlign: 'center', marginTop: 20 },
+});

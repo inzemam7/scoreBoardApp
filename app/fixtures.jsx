@@ -77,6 +77,12 @@ const Fixtures = () => {
       const history = await AsyncStorage.getItem('matchHistory');
       const completedMatches = history ? JSON.parse(history) : [];
 
+      // Check if there are any matches played
+      if (!fixtures.length) {
+        Alert.alert('No fixtures available', 'Please start a new tournament.');
+        return;
+      }
+
       if (completedMatches.length === 0) {
         Alert.alert('No matches played', 'Please play some matches first.');
         return;
@@ -84,13 +90,15 @@ const Fixtures = () => {
 
       // If there's only one team left, they're the tournament winner
       if (currentTeams.length === 1) {
-        Alert.alert(`🏆 Tournament Complete`, `${teamNames[currentTeams[0]]} wins the tournament!`);
         setTournamentWinner(teamNames[currentTeams[0]]);
+        Alert.alert(`🏆 Tournament Complete`, `${teamNames[currentTeams[0]]} wins the tournament!`);
         return;
       }
 
       // Check which matches from current fixtures have been played
       const playedFixtures = fixtures.map(([teamA, teamB]) => {
+        if (!teamB) return { teamA, teamB: null, winner: teamA, isPlayed: true }; // Handle bye matches
+
         const isPlayed = completedMatches.some(match => 
           (match.teamA === teamNames[teamA] && match.teamB === teamNames[teamB]) ||
           (match.teamA === teamNames[teamB] && match.teamB === teamNames[teamA])
@@ -117,34 +125,26 @@ const Fixtures = () => {
         };
       });
 
-      // For semi-finals, check if both matches are played
-      if (round === 2) {
-        const unplayedMatches = playedFixtures.filter(match => !match.isPlayed);
-        if (unplayedMatches.length > 0) {
-          Alert.alert(
-            'Matches Pending',
-            'Please complete all semi-final matches before proceeding to final.'
-          );
-          return;
-        }
+      // Check if all matches in current round are played
+      const unplayedMatches = playedFixtures.filter(match => !match.isPlayed && match.teamB !== null);
+      if (unplayedMatches.length > 0) {
+        Alert.alert(
+          'Matches Pending',
+          'Please complete all matches in the current round before proceeding.'
+        );
+        return;
       }
 
       // Get winners from played matches
-      const winners = playedFixtures.map(fixture => fixture.winner || fixture.teamA);
+      const winners = playedFixtures.map(fixture => fixture.winner).filter(Boolean);
 
       // Create next round fixtures
-      const nextRoundFixtures = [];
-      for (let i = 0; i < winners.length; i += 2) {
-        if (i + 1 < winners.length) {
-          nextRoundFixtures.push([winners[i], winners[i + 1]]);
-        } else {
-          nextRoundFixtures.push([winners[i], null]);
-        }
-      }
+      const nextRoundFixtures = generateFixtures(winners);
 
+      // Update tournament state based on number of winners
       if (winners.length === 1) {
-        Alert.alert(`${teamNames[winners[0]]} wins the tournament!`);
         setTournamentWinner(teamNames[winners[0]]);
+        Alert.alert(`🏆 Tournament Complete`, `${teamNames[winners[0]]} wins the tournament!`);
         setRound(1);
       } else if (winners.length === 2) {
         Alert.alert('Proceeding to Final!');
@@ -167,15 +167,15 @@ const Fixtures = () => {
 
   const handleReturnToRound1 = async () => {
     try {
-      // Reset all tournament state
+      // Reset tournament state while preserving match history
       setRound(1);
       setTournamentWinner(null);
-      setMatchResults(null);
       
       // Get the initial teams and tournament setup
       const playersData = await AsyncStorage.getItem('teamPlayers');
       const namesData = await AsyncStorage.getItem('teamNamesInput');
       const initialFixturesData = await AsyncStorage.getItem('initialTournamentFixtures');
+      const historyData = await AsyncStorage.getItem('matchHistory');
       
       if (playersData && namesData) {
         const parsedPlayers = JSON.parse(playersData);
@@ -186,21 +186,18 @@ const Fixtures = () => {
         setTeamNames(parsedNames);
         setCurrentTeams(Object.keys(parsedPlayers));
 
-        // If we have saved initial fixtures, use those
+        // Restore initial fixtures
         if (initialFixturesData) {
           const initialFixtures = JSON.parse(initialFixturesData);
           setFixtures(initialFixtures);
           await AsyncStorage.setItem('tournamentFixtures', JSON.stringify(initialFixtures));
-        } else {
-          // If no initial fixtures found, generate new ones
-          const newFixtures = generateFixtures(Object.keys(parsedPlayers));
-          setFixtures(newFixtures);
-          await AsyncStorage.setItem('tournamentFixtures', JSON.stringify(newFixtures));
-          await AsyncStorage.setItem('initialTournamentFixtures', JSON.stringify(newFixtures));
         }
-      } else {
-        Alert.alert('Error', 'Could not load initial tournament data.');
-        return;
+
+        // Preserve match history
+        if (historyData) {
+          const history = JSON.parse(historyData);
+          setCompletedMatches(history);
+        }
       }
     } catch (error) {
       console.error('Error resetting tournament:', error);
