@@ -44,13 +44,11 @@ const TeamSetup = () => {
       if (!teamNamesInput[team]) {
         return false;
       }
-      if (!teamPlayers[team] || Object.keys(teamPlayers[team]).length !== 11) {
+      if (!teamPlayers[team] || Object.keys(teamPlayers[team]).length !== 1) {
         return false;
       }
-      for (let i = 0; i < 11; i++) {
-        if (!teamPlayers[team][i]) {
-          return false;
-        }
+      if (!teamPlayers[team][0]) {
+        return false;
       }
     }
     return true;
@@ -64,7 +62,7 @@ const TeamSetup = () => {
 
     await AsyncStorage.setItem('teamPlayers', JSON.stringify(teamPlayers));
     await AsyncStorage.setItem('teamNamesInput', JSON.stringify(teamNamesInput));
-        router.push('/fixtures');
+    router.push('/fixtures');
   };
 
   if (!tournamentData) {
@@ -91,15 +89,12 @@ const TeamSetup = () => {
                 onChangeText={(text) => handleTeamNameChange(team, text)}
                 value={teamNamesInput[team] || ''}
               />
-              {Array.from({ length: 11 }, (_, i) => (
-                <TextInput
-                  key={i}
-                  style={styles.playerInput}
-                  placeholder={`Player ${i + 1}`}
-                  onChangeText={(text) => handlePlayerChange(team, i, text)}
-                  value={teamPlayers[team] ? teamPlayers[team][i] : ''} // Persist entered values
-                />
-              ))}
+              <TextInput
+                style={styles.playerInput}
+                placeholder="Player Name"
+                onChangeText={(text) => handlePlayerChange(team, 0, text)}
+                value={teamPlayers[team] ? teamPlayers[team][0] : ''}
+              />
             </View>
           )}
         </View>

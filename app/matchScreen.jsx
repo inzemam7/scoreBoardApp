@@ -5,8 +5,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const MatchScreen = () => {
-    const { teamA, teamB, matchNumber, tossWinner: passedTossWinner } = useLocalSearchParams();
-
+    const params = useLocalSearchParams();
+    const { teamA, teamB, matchNumber, tossWinner: passedTossWinner, isViewOnly, matchData, isSingleMatch } = params;
     const router = useRouter();
 
     const [tossWinner, setTossWinner] = useState(null);
@@ -16,6 +16,8 @@ const MatchScreen = () => {
     const [bowlingTeam, setBowlingTeam] = useState(null);
     const [teamAName, setTeamAName] = useState(teamA);
     const [teamBName, setTeamBName] = useState(teamB);
+    const [returnPath] = useState(isSingleMatch === 'true' ? '/cricSingle' : '/fixtures');
+    const [historyKey] = useState(isSingleMatch === 'true' ? 'singleMatchHistory' : 'matchHistory');
 
     const [inningsData, setInningsData] = useState([
         { score: 0, wickets: 0, balls: 0, history: [] },
@@ -26,15 +28,50 @@ const MatchScreen = () => {
     const [isMatchOver, setIsMatchOver] = useState(false);
     const [target, setTarget] = useState(null);
     const [winner, setWinner] = useState(null);
+    
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const tournamentData = await AsyncStorage.getItem('cricTournamentSetup');
-                if (tournamentData) {
-                    const parsed = JSON.parse(tournamentData);
-                    setOversLimit(parseInt(parsed.overs));
+                if (isViewOnly && matchData) {
+                    const parsedMatchData = JSON.parse(matchData);
+                    setTeamAName(parsedMatchData.teamA);
+                    setTeamBName(parsedMatchData.teamB);
+                    setTossWinner(parsedMatchData.tossWinner);
+                    setTossDecision(parsedMatchData.tossDecision);
+                    setInningsData([
+                        {
+                            score: parsedMatchData.innings[0].score,
+                            wickets: parsedMatchData.innings[0].wickets,
+                            balls: Math.floor(parsedMatchData.innings[0].overs * 6),
+                            history: []
+                        },
+                        {
+                            score: parsedMatchData.innings[1].score,
+                            wickets: parsedMatchData.innings[1].wickets,
+                            balls: Math.floor(parsedMatchData.innings[1].overs * 6),
+                            history: []
+                        }
+                    ]);
+                    setWinner(parsedMatchData.winner);
+                    setIsMatchOver(true);
+                    return;
                 }
+
+                // Check if it's a single match
+                const singleMatchData = await AsyncStorage.getItem('currentMatchData');
+                if (singleMatchData) {
+                    const parsed = JSON.parse(singleMatchData);
+                    setOversLimit(parseInt(parsed.overs));
+                } else {
+                    // Tournament match
+                    const tournamentData = await AsyncStorage.getItem('cricTournamentSetup');
+                    if (tournamentData) {
+                        const parsed = JSON.parse(tournamentData);
+                        setOversLimit(parseInt(parsed.overs));
+                    }
+                }
+
                 if (passedTossWinner) {
                     setTossWinner(passedTossWinner);
                 }
@@ -69,9 +106,9 @@ const MatchScreen = () => {
         setTarget(targetScore);
 
         if (isAllOut) {
-            Alert.alert(`${battingTeam} All Out`, `${bowlingTeam} needs ${targetScore} to win.`);
+            Alert.alert(`${battingTeam} All Out`, `${bowlingTeam} needs ${targetScore} runs to win.`);
         } else {
-            Alert.alert('1st Innings Over', `${bowlingTeam} needs ${targetScore} to win.`);
+            Alert.alert('1st Innings Over', `${bowlingTeam} needs ${targetScore} runs to win.`);
         }
 
         setBattingTeam(bowlingTeam);
@@ -79,11 +116,73 @@ const MatchScreen = () => {
         setCurrentInning(2);
     };
 
+    const saveMatchToHistory = async (matchData) => {
+        try {
+            const historyJSON = await AsyncStorage.getItem(historyKey);
+            const history = historyJSON ? JSON.parse(historyJSON) : [];
+    
+            history.push(matchData);
+    
+            await AsyncStorage.setItem(historyKey, JSON.stringify(history));
+            console.log("✅ Match saved to history");
+        } catch (error) {
+            console.error("❌ Error saving match history", error);
+        }
+    };
+
     const endMatch = (matchWinner) => {
         setIsMatchOver(true);
         setWinner(matchWinner);
-        Alert.alert('🏆 Match Over', matchWinner === 'Tie' ? "It's a tie!" : `${matchWinner} wins!`);
+    
+        const matchData = {
+            teamA: teamAName,
+            teamB: teamBName,
+            winner: matchWinner,
+            matchNumber,
+            playedOn: new Date().toLocaleString(),
+            innings: [
+                {
+                    team: currentInning === 1 ? battingTeam : bowlingTeam,
+                    score: inningsData[0].score,
+                    wickets: inningsData[0].wickets,
+                    overs: Math.floor(inningsData[0].balls / 6) + (inningsData[0].balls % 6) / 10
+                },
+                {
+                    team: currentInning === 2 ? battingTeam : bowlingTeam,
+                    score: inningsData[1].score,
+                    wickets: inningsData[1].wickets,
+                    overs: Math.floor(inningsData[1].balls / 6) + (inningsData[1].balls % 6) / 10
+                }
+            ],
+            tossWinner,
+            tossDecision,
+            teamAScore: currentInning === 1 ? inningsData[0].score : inningsData[1].score,
+            teamBScore: currentInning === 1 ? inningsData[1].score : inningsData[0].score,
+            teamAWickets: currentInning === 1 ? inningsData[0].wickets : inningsData[1].wickets,
+            teamBWickets: currentInning === 1 ? inningsData[1].wickets : inningsData[0].wickets
+        };
+    
+        Alert.alert(
+            '🏆 Match Over',
+            matchWinner === 'Tie' ? "It's a tie!" : `${matchWinner} wins!\n\nDo you want to save this match to history?`,
+            [
+                {
+                    text: 'No',
+                    style: 'cancel',
+                    onPress: () => router.push(returnPath),
+                },
+                {
+                    text: 'Yes',
+                    onPress: async () => {
+                        await saveMatchToHistory(matchData);
+                        router.push(returnPath);
+                    },
+                },
+            ]
+        );
     };
+    
+    
 
     const updateBall = (runs, extra = false, isWicket = false) => {
         if (isMatchOver) return;
@@ -199,15 +298,30 @@ const MatchScreen = () => {
     return (
         <ScrollView style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.title}>🏏 Match - {matchNumber || 1}</Text>
+                <Text style={styles.title}>
+                    {isViewOnly ? '📜 Match Details' :
+                     matchNumber === '3' ? '🏆 Final' : 
+                     matchNumber === '2' ? '🎯 Semi-Final' : 
+                     '🏏 Match - ' + (matchNumber || 1)}
+                </Text>
                 <Text style={styles.teams}>
                     {teamAName} vs {teamBName}
                 </Text>
             </View>
 
-            {tossWinner === null ? (
+            {isViewOnly ? (
+                <>
+                    <Text style={styles.tossResult}>
+                        {tossWinner} won the toss and chose to {tossDecision}
+                    </Text>
+                    {renderInningsSummary()}
+                    <Text style={[styles.winnerText, { marginTop: 20 }]}>
+                        {winner === 'Tie' ? "Match Tied!" : `${winner} won the match!`}
+                    </Text>
+                </>
+            ) : tossWinner === null ? (
                 <TouchableOpacity style={styles.tossButton} onPress={handleToss}>
-                    <Text style={styles.buttonText}>Start Match</Text>
+                    <Text style={styles.buttonText}>🎯 Toss</Text>
                 </TouchableOpacity>
             ) : !tossDecision ? (
                 <>
@@ -295,4 +409,5 @@ const styles = StyleSheet.create({
   inningsBox: { flex: 1, backgroundColor: '#333', padding: 15, borderRadius: 10, marginHorizontal: 5, alignItems: 'center' },
   inningsTeam: { fontSize: 16, fontWeight: 'bold', color: 'lightblue', marginBottom: 5 },
   inningsScore: { fontSize: 16, color: 'white' },
+  winnerText: { fontSize: 18, color: 'gold', textAlign: 'center', marginTop: 20 },
 });
