@@ -84,6 +84,14 @@ const MatchHistory = () => {
             style={styles.matchCard}
             onPress={() => viewMatchDetails(match)}
           >
+            <View style={styles.matchHeader}>
+              <Text style={styles.matchNumber}>
+                {match.matchNumber ? `Match ${match.matchNumber}` : 'Practice Match'}
+              </Text>
+              {match.round && (
+                <Text style={styles.roundText}>{match.round}</Text>
+              )}
+            </View>
             <Text style={styles.matchText}>
               {match.teamA} vs {match.teamB}
             </Text>
@@ -136,6 +144,22 @@ const styles = StyleSheet.create({
     padding: 15,
     marginBottom: 10,
     borderRadius: 8,
+  },
+  matchHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  matchNumber: {
+    fontSize: 14,
+    color: '#888',
+    fontWeight: 'bold',
+  },
+  roundText: {
+    fontSize: 14,
+    color: '#4CAF50',
+    fontWeight: 'bold',
   },
   matchText: {
     fontSize: 18,

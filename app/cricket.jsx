@@ -1,54 +1,74 @@
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import { useRouter } from 'expo-router';
 
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Link } from 'expo-router';
+export default function Cricket() {
+  const router = useRouter();
 
-const Cricket = () => {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Cricket</Text>
-      <Link href="/cricTournamentSetup" asChild>
-        <TouchableOpacity style={styles.button}>
-          <Text style={styles.buttonText}>Tournament</Text>
-        </TouchableOpacity>
-      </Link>
-      <Link href="/cricSingle" asChild>
-      <TouchableOpacity style={styles.button}>
-        <Text style={styles.buttonText}>One-Off Match</Text>
-      </TouchableOpacity>
-      </Link>
-
-    </View>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        <Text style={styles.title}>Cricket Scoring</Text>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity 
+            style={styles.button}
+            onPress={() => router.push('/cricSingle')}
+          >
+            <Text style={styles.buttonText}>One-off Match</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.button}
+            onPress={() => router.push('/cricTournamentSetup')}
+          >
+            <Text style={styles.buttonText}>Tournament</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </SafeAreaView>
   );
-};
-
-export default Cricket;
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'lightyellow',
-    justifyContent: 'center',
+    backgroundColor: '#222',
+  },
+  content: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
   },
   title: {
-    color: 'gold',
-    fontSize: 50,
+    fontSize: 40,
     fontWeight: 'bold',
-    marginBottom: 80,
+    color: 'gold',
+    marginBottom: 40,
+    textAlign: 'center',
+  },
+  buttonContainer: {
+    width: '100%',
+    maxWidth: 300,
+    gap: 20,
   },
   button: {
     backgroundColor: '#333',
     paddingVertical: 15,
     paddingHorizontal: 30,
     borderRadius: 50,
-    marginBottom: 30,
-    width: 300,
     alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    width: 300,
   },
   buttonText: {
     color: 'white',
     fontSize: 35,
     fontWeight: 'bold',
   },
-});
+}); 

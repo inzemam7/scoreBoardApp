@@ -1,64 +1,80 @@
-import { View, Text, StyleSheet } from "react-native";
-import React from "react";
-import { Link } from "expo-router";
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import { useRouter } from 'expo-router';
 
-const Index = () => {
+export default function Home() {
+  const router = useRouter();
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.Text}>InScore</Text>
-
-      <Link href="/cricket" style={styles.Link}>
-        <Text style={styles.linkText}>Cricket</Text>
-      </Link>
-
-      <Link href="/football" style={styles.Link}>
-        <Text style={styles.linkText}>Football</Text>
-      </Link>
-
-      <Link href="/aboutUs" style={styles.Link}>
-        <Text style={styles.linkText}>About Us</Text>
-      </Link>
-    </View>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        <Text style={styles.title}>Score Board App</Text>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity 
+            style={styles.button} 
+            onPress={() => router.push('/cricket')}
+          >
+            <Text style={styles.buttonText}>Cricket</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.button}
+            onPress={() => router.push('/football')}
+          >
+            <Text style={styles.buttonText}>Football</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.button}
+            onPress={() => router.push('/aboutUs')}
+          >
+            <Text style={styles.buttonText}>About Us</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </SafeAreaView>
   );
-};
-
-export default Index;
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    flexDirection: "column",
-    backgroundColor: "lightyellow",
-    alignItems: "center", // Centering items horizontally
-    justifyContent: "center", // Centering items vertically
-    padding: 20, // Ensuring spacing around the content
+    backgroundColor: '#222',
   },
-  Text: {
-    color: "white",
-    fontSize: 70,
-    fontWeight: "bold",
-    textAlign: "center",
-    backgroundColor: "gold",
-    marginBottom: 50, // Adjusting bottom margin
-    height: 140, // Reduced height for better appearance
-    width: "90%", // Using percentage width to make it more responsive
-    borderRadius: 60,
-    justifyContent: "center", // Centering text vertically inside the box
-    padding: 10, // Padding to center the text vertically
+  content: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
   },
-  Link: {
-    marginTop: 15, // Adding margin to space out the links
-    marginBottom: 10, // Adjusted margin to separate links properly
-    width: 300,
-    alignItems: "center", // Center the link text horizontally
-    backgroundColor: "#333",
+  title: {
+    fontSize: 40,
+    fontWeight: 'bold',
+    color: 'gold',
+    marginBottom: 40,
+    textAlign: 'center',
+  },
+  buttonContainer: {
+    width: '100%',
+    maxWidth: 300,
+    gap: 20,
+  },
+  button: {
+    backgroundColor: '#333',
     paddingVertical: 15,
+    paddingHorizontal: 30,
     borderRadius: 50,
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    width: 300,
   },
-  linkText: {
-    color: "white",
+  buttonText: {
+    color: 'white',
     fontSize: 35,
-    fontWeight: "bold",
-    textAlign: "center",
-  }
-});
+    fontWeight: 'bold',
+  },
+}); 

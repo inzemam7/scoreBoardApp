@@ -77,42 +77,51 @@ const Cricsingle = () => {
   };
 
   const addPlayer = (team) => {
+    const players = team === 1 ? team1Players : team2Players;
+    if (players.length >= 11) {
+      Alert.alert('Player Limit Reached', 'Maximum 11 players allowed per team.');
+      return;
+    }
     if (team === 1) {
-      if (team1Players.length >= 11) {
-        Alert.alert('Player Limit Reached', 'Maximum 11 players allowed per team.');
-        return;
-      }
       setTeam1Players([...team1Players, '']);
     } else {
-      if (team2Players.length >= 11) {
-        Alert.alert('Player Limit Reached', 'Maximum 11 players allowed per team.');
-        return;
-      }
       setTeam2Players([...team2Players, '']);
     }
   };
 
   const removePlayer = (team, index) => {
     if (team === 1) {
-      if (team1Players.length <= 1) {
-        Alert.alert('Minimum Players', 'Team must have at least one player.');
-        return;
-      }
       const updated = team1Players.filter((_, i) => i !== index);
-      setTeam1Players(updated);
-    } else {
-      if (team2Players.length <= 1) {
-        Alert.alert('Minimum Players', 'Team must have at least one player.');
-        return;
+      if (updated.length === 0) {
+        // Ensure at least one player input field remains
+        setTeam1Players(['']);
+      } else {
+        setTeam1Players(updated);
       }
+    } else {
       const updated = team2Players.filter((_, i) => i !== index);
-      setTeam2Players(updated);
+      if (updated.length === 0) {
+        // Ensure at least one player input field remains
+        setTeam2Players(['']);
+      } else {
+        setTeam2Players(updated);
+      }
     }
   };
 
   const handleSubmit = async () => {
-    if (!overs || !team1 || !team2 || team1Players.some(p => !p) || team2Players.some(p => !p)) {
-      Alert.alert('Missing Info', 'Please fill all fields including team players.');
+    if (!overs || !team1 || !team2) {
+      Alert.alert('Missing Info', 'Please fill in all team names and select overs.');
+      return;
+    }
+
+    if (team1Players.some(p => !p) || team2Players.some(p => !p)) {
+      Alert.alert('Missing Players', 'Please fill in all player names.');
+      return;
+    }
+
+    if (team1Players.length < 2 || team2Players.length < 2) {
+      Alert.alert('Not Enough Players', 'Each team must have at least 2 players.');
       return;
     }
 
@@ -204,7 +213,10 @@ const Cricsingle = () => {
         </Modal>
 
         <View style={styles.teamContainer}>
-          <Text style={styles.subTitle}>Team 1</Text>
+          <View style={styles.teamHeader}>
+            <Text style={styles.subTitle}>Team 1</Text>
+            <Text style={styles.playerCount}>{team1Players.length}/11 players</Text>
+          </View>
           <TextInput
             style={styles.input}
             placeholder="Team 1 Name"
@@ -213,10 +225,7 @@ const Cricsingle = () => {
             placeholderTextColor="#666"
           />
           
-          <View style={styles.playerHeaderContainer}>
-            <Text style={styles.playerTitle}>Players</Text>
-            <Text style={styles.playerCount}>({team1Players.length}/11)</Text>
-          </View>
+          <Text style={styles.playerTitle}>Players</Text>
           {team1Players.map((player, index) => (
             <View key={`t1p${index}`} style={styles.playerInputContainer}>
               <TextInput
@@ -234,17 +243,18 @@ const Cricsingle = () => {
               </TouchableOpacity>
             </View>
           ))}
-          <TouchableOpacity 
-            style={[styles.addButton, team1Players.length >= 11 && styles.disabledButton]} 
-            onPress={() => addPlayer(1)}
-            disabled={team1Players.length >= 11}
-          >
-            <Text style={styles.addButtonText}>+ Add Player</Text>
-          </TouchableOpacity>
+          {team1Players.length < 11 && (
+            <TouchableOpacity style={styles.addButton} onPress={() => addPlayer(1)}>
+              <Text style={styles.addButtonText}>+ Add Player</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.teamContainer}>
-          <Text style={styles.subTitle}>Team 2</Text>
+          <View style={styles.teamHeader}>
+            <Text style={styles.subTitle}>Team 2</Text>
+            <Text style={styles.playerCount}>{team2Players.length}/11 players</Text>
+          </View>
           <TextInput
             style={styles.input}
             placeholder="Team 2 Name"
@@ -253,10 +263,7 @@ const Cricsingle = () => {
             placeholderTextColor="#666"
           />
           
-          <View style={styles.playerHeaderContainer}>
-            <Text style={styles.playerTitle}>Players</Text>
-            <Text style={styles.playerCount}>({team2Players.length}/11)</Text>
-          </View>
+          <Text style={styles.playerTitle}>Players</Text>
           {team2Players.map((player, index) => (
             <View key={`t2p${index}`} style={styles.playerInputContainer}>
               <TextInput
@@ -274,13 +281,11 @@ const Cricsingle = () => {
               </TouchableOpacity>
             </View>
           ))}
-          <TouchableOpacity 
-            style={[styles.addButton, team2Players.length >= 11 && styles.disabledButton]} 
-            onPress={() => addPlayer(2)}
-            disabled={team2Players.length >= 11}
-          >
-            <Text style={styles.addButtonText}>+ Add Player</Text>
-          </TouchableOpacity>
+          {team2Players.length < 11 && (
+            <TouchableOpacity style={styles.addButton} onPress={() => addPlayer(2)}>
+              <Text style={styles.addButtonText}>+ Add Player</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <TouchableOpacity style={styles.startButton} onPress={handleSubmit}>
@@ -403,10 +408,15 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     width: '100%',
   },
+  teamHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
   subTitle: {
     fontSize: 24,
     fontWeight: '600',
-    marginBottom: 15,
     color: 'white',
   },
   input: {
@@ -416,23 +426,12 @@ const styles = StyleSheet.create({
     color: 'white',
     marginBottom: 10,
   },
-  playerHeaderContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 15,
-    marginBottom: 10,
-  },
   playerTitle: {
     fontSize: 18,
     fontWeight: '600',
     marginTop: 15,
     marginBottom: 10,
     color: 'white',
-  },
-  playerCount: {
-    color: '#4CAF50',
-    fontSize: 14,
-    marginLeft: 10,
   },
   playerInputContainer: {
     flexDirection: 'row',
@@ -523,8 +522,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  disabledButton: {
-    backgroundColor: '#666',
-    opacity: 0.7,
+  playerCount: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

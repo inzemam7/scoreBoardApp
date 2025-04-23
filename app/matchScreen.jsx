@@ -5,8 +5,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const MatchScreen = () => {
-    const { teamA, teamB, matchNumber, tossWinner: passedTossWinner, isViewOnly, matchData } = useLocalSearchParams();
-
+    const params = useLocalSearchParams();
+    const { teamA, teamB, matchNumber, tossWinner: passedTossWinner, isViewOnly, matchData, isSingleMatch } = params;
     const router = useRouter();
 
     const [tossWinner, setTossWinner] = useState(null);
@@ -16,6 +16,8 @@ const MatchScreen = () => {
     const [bowlingTeam, setBowlingTeam] = useState(null);
     const [teamAName, setTeamAName] = useState(teamA);
     const [teamBName, setTeamBName] = useState(teamB);
+    const [returnPath] = useState(isSingleMatch === 'true' ? '/cricSingle' : '/fixtures');
+    const [historyKey] = useState(isSingleMatch === 'true' ? 'singleMatchHistory' : 'matchHistory');
 
     const [inningsData, setInningsData] = useState([
         { score: 0, wickets: 0, balls: 0, history: [] },
@@ -27,6 +29,11 @@ const MatchScreen = () => {
     const [target, setTarget] = useState(null);
     const [winner, setWinner] = useState(null);
     
+    const [showWideOptions, setShowWideOptions] = useState(false);
+    const [showNoBallOptions, setShowNoBallOptions] = useState(false);
+    const [showLegByeOptions, setShowLegByeOptions] = useState(false);
+
+    const extraRunOptions = [0, 1, 2, 3, 4, 5, 6];
 
     useEffect(() => {
         const fetchData = async () => {
@@ -116,10 +123,6 @@ const MatchScreen = () => {
 
     const saveMatchToHistory = async (matchData) => {
         try {
-            // Check if it's a single match
-            const params = useLocalSearchParams();
-            const historyKey = params.isSingleMatch === 'true' ? 'singleMatchHistory' : 'matchHistory';
-            
             const historyJSON = await AsyncStorage.getItem(historyKey);
             const history = historyJSON ? JSON.parse(historyJSON) : [];
     
@@ -140,36 +143,32 @@ const MatchScreen = () => {
             teamA: teamAName,
             teamB: teamBName,
             winner: matchWinner,
-            matchNumber,
+            matchNumber: parseInt(matchNumber) || 1,
+            round: getRoundName(),
             playedOn: new Date().toLocaleString(),
             innings: [
                 {
                     team: currentInning === 1 ? battingTeam : bowlingTeam,
                     score: inningsData[0].score,
                     wickets: inningsData[0].wickets,
-                    overs: Math.floor(inningsData[0].balls / 6) + (inningsData[0].balls % 6) / 10
+                    overs: (Math.floor(inningsData[0].balls / 6) + (inningsData[0].balls % 6) / 10).toFixed(1)
                 },
                 {
                     team: currentInning === 2 ? battingTeam : bowlingTeam,
                     score: inningsData[1].score,
                     wickets: inningsData[1].wickets,
-                    overs: Math.floor(inningsData[1].balls / 6) + (inningsData[1].balls % 6) / 10
+                    overs: (Math.floor(inningsData[1].balls / 6) + (inningsData[1].balls % 6) / 10).toFixed(1)
                 }
             ],
             tossWinner,
             tossDecision,
-            teamAScore: currentInning === 1 ? inningsData[0].score : inningsData[1].score,
-            teamBScore: currentInning === 1 ? inningsData[1].score : inningsData[0].score,
-            teamAWickets: currentInning === 1 ? inningsData[0].wickets : inningsData[1].wickets,
-            teamBWickets: currentInning === 1 ? inningsData[1].wickets : inningsData[0].wickets
+            target: target || null,
+            result: getMatchResult(matchWinner)
         };
     
-        const isSingleMatch = useLocalSearchParams().isSingleMatch === 'true';
-        const returnPath = isSingleMatch ? '/cricSingle' : '/fixtures';
-
         Alert.alert(
             '🏆 Match Over',
-            matchWinner === 'Tie' ? "It's a tie!" : `${matchWinner} wins!\n\nDo you want to save this match to history?`,
+            getMatchSummary(matchData),
             [
                 {
                     text: 'No',
@@ -186,10 +185,42 @@ const MatchScreen = () => {
             ]
         );
     };
-    
-    
 
-    const updateBall = (runs, extra = false, isWicket = false) => {
+    const getRoundName = () => {
+        if (!isSingleMatch) {
+            const currentRound = parseInt(matchNumber);
+            if (currentRound <= 2) return 'Quarter Finals';
+            if (currentRound <= 4) return 'Semi Finals';
+            return 'Finals';
+        }
+        return null;
+    };
+
+    const getMatchResult = (matchWinner) => {
+        if (matchWinner === 'Tie') return 'Match Tied';
+        
+        const winningInnings = currentInning === 1 ? 0 : 1;
+        const margin = currentInning === 2 
+            ? `${target - inningsData[1].score - 1} runs`
+            : `${10 - inningsData[0].wickets} wickets`;
+            
+        return `${matchWinner} won by ${margin}`;
+    };
+
+    const getMatchSummary = (matchData) => {
+        let summary = matchData.winner === 'Tie' 
+            ? "It's a tie!\n\n" 
+            : `${matchData.winner} wins!\n\n`;
+
+        summary += `${matchData.innings[0].team}: ${matchData.innings[0].score}/${matchData.innings[0].wickets} (${matchData.innings[0].overs})\n`;
+        summary += `${matchData.innings[1].team}: ${matchData.innings[1].score}/${matchData.innings[1].wickets} (${matchData.innings[1].overs})\n\n`;
+        summary += matchData.result;
+        summary += '\n\nDo you want to save this match to history?';
+
+        return summary;
+    };
+
+    const updateBall = (runs, extra = false, isWicket = false, extraType = null) => {
         if (isMatchOver) return;
 
         const newData = [...inningsData];
@@ -200,11 +231,19 @@ const MatchScreen = () => {
             newData[inningIndex].wickets += 1;
             newData[inningIndex].balls += 1;
             historyEntry.type = 'wicket';
+        } else if (extra) {
+            newData[inningIndex].score += runs;
+            historyEntry.type = extraType || 'extra';
+            historyEntry.runs = runs;
+            // Only count the ball for leg byes
+            if (extraType === 'legbye') {
+                newData[inningIndex].balls += 1;
+            }
         } else {
             newData[inningIndex].score += runs;
-            historyEntry.type = extra ? 'extra' : 'run';
+            historyEntry.type = 'run';
             historyEntry.runs = runs;
-            if (!extra) newData[inningIndex].balls += 1;
+            newData[inningIndex].balls += 1;
         }
 
         newData[inningIndex].history.push(historyEntry);
@@ -374,11 +413,88 @@ const MatchScreen = () => {
                         <Button title="4" onPress={() => updateBall(4)} />
                         <Button title="5" onPress={() => updateBall(5)} />
                         <Button title="6" onPress={() => updateBall(6)} />
-                        <Button title="Wide" color="purple" onPress={() => updateBall(1, true)} />
-                        <Button title="No Ball" color="orange" onPress={() => updateBall(1, true)} />
-                        <Button title="Leg Bye" color="#999" onPress={() => updateBall(1, true)} />
                         <Button title="Wicket" color="red" onPress={() => updateBall(0, false, true)} />
                         <Button title="Undo" color="#ffcc00" onPress={undoLastBall} />
+                    </View>
+
+                    <View style={styles.extrasContainer}>
+                        <View style={styles.extraColumn}>
+                            <Text style={styles.extraTitle}>Wide Ball Options</Text>
+                            <TouchableOpacity
+                                style={styles.extraButton}
+                                onPress={() => setShowWideOptions(!showWideOptions)}
+                            >
+                                <Text style={styles.buttonText}>Wide +</Text>
+                            </TouchableOpacity>
+                            {showWideOptions && (
+                                <View style={styles.optionsContainer}>
+                                    {extraRunOptions.map((runs) => (
+                                        <TouchableOpacity
+                                            key={`wide${runs}`}
+                                            style={styles.optionButton}
+                                            onPress={() => {
+                                                updateBall(runs + 1, true, false, 'wide');
+                                                setShowWideOptions(false);
+                                            }}
+                                        >
+                                            <Text style={styles.optionText}>Wide + {runs}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
+
+                        <View style={styles.extraColumn}>
+                            <Text style={styles.extraTitle}>No Ball Options</Text>
+                            <TouchableOpacity
+                                style={styles.extraButton}
+                                onPress={() => setShowNoBallOptions(!showNoBallOptions)}
+                            >
+                                <Text style={styles.buttonText}>No Ball +</Text>
+                            </TouchableOpacity>
+                            {showNoBallOptions && (
+                                <View style={styles.optionsContainer}>
+                                    {extraRunOptions.map((runs) => (
+                                        <TouchableOpacity
+                                            key={`noball${runs}`}
+                                            style={styles.optionButton}
+                                            onPress={() => {
+                                                updateBall(runs + 1, true, false, 'noball');
+                                                setShowNoBallOptions(false);
+                                            }}
+                                        >
+                                            <Text style={styles.optionText}>No Ball + {runs}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
+
+                        <View style={styles.extraColumn}>
+                            <Text style={styles.extraTitle}>Leg Bye Options</Text>
+                            <TouchableOpacity
+                                style={styles.extraButton}
+                                onPress={() => setShowLegByeOptions(!showLegByeOptions)}
+                            >
+                                <Text style={styles.buttonText}>Leg Bye +</Text>
+                            </TouchableOpacity>
+                            {showLegByeOptions && (
+                                <View style={styles.optionsContainer}>
+                                    {extraRunOptions.map((runs) => (
+                                        <TouchableOpacity
+                                            key={`legbye${runs}`}
+                                            style={styles.optionButton}
+                                            onPress={() => {
+                                                updateBall(runs, true, false, 'legbye');
+                                                setShowLegByeOptions(false);
+                                            }}
+                                        >
+                                            <Text style={styles.optionText}>Leg Bye + {runs}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
                     </View>
                 </>
             )}
@@ -415,4 +531,46 @@ const styles = StyleSheet.create({
   inningsTeam: { fontSize: 16, fontWeight: 'bold', color: 'lightblue', marginBottom: 5 },
   inningsScore: { fontSize: 16, color: 'white' },
   winnerText: { fontSize: 18, color: 'gold', textAlign: 'center', marginTop: 20 },
+  extrasContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 10,
+    padding: 10,
+  },
+  extraColumn: {
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  extraTitle: {
+    color: '#ccc',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 5,
+  },
+  extraButton: {
+    backgroundColor: '#444',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  optionsContainer: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: '#333',
+    borderRadius: 5,
+    marginTop: 5,
+    zIndex: 1000,
+    elevation: 5,
+  },
+  optionButton: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#444',
+  },
+  optionText: {
+    color: 'white',
+    textAlign: 'center',
+  },
 });

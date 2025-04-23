@@ -54,15 +54,22 @@ const TeamSetup = () => {
     return true;
   };
 
-  const handleTeamSubmit = async () => {
-    if (!isFormValid()) {
-      Alert.alert('Missing Info', 'Please fill all team names and player name fields for each team.', [{ text: 'OK' }]);
-      return;
+  const handleSubmit = async () => {
+    if (isFormValid()) {
+      try {
+        await AsyncStorage.setItem('teamPlayers', JSON.stringify(teamPlayers));
+        await AsyncStorage.setItem('teamNamesInput', JSON.stringify(teamNamesInput));
+        // Set flag for new tournament
+        await AsyncStorage.setItem('isNewTournament', 'true');
+        // Clear any existing tournament data
+        await AsyncStorage.removeItem('matchHistory');
+        await AsyncStorage.removeItem('tournamentFixtures');
+        
+        router.push('/fixtures');
+      } catch (error) {
+        Alert.alert('Error', 'Failed to save team data');
+      }
     }
-
-    await AsyncStorage.setItem('teamPlayers', JSON.stringify(teamPlayers));
-    await AsyncStorage.setItem('teamNamesInput', JSON.stringify(teamNamesInput));
-    router.push('/fixtures');
   };
 
   if (!tournamentData) {
@@ -99,7 +106,7 @@ const TeamSetup = () => {
           )}
         </View>
       ))}
-      <TouchableOpacity style={styles.submitButton} onPress={handleTeamSubmit}>
+      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
         <Text style={styles.submitButtonText}>Submit Teams</Text>
       </TouchableOpacity>
     </ScrollView>
