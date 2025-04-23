@@ -34,6 +34,9 @@ const FootballFixtures = () => {
             pairs.push({
               teamA: shuffledTeams[i],
               teamB: shuffledTeams[i + 1],
+              status: 'upcoming',
+              score: { teamA: 0, teamB: 0 },
+              scheduledTime: new Date(Date.now() + (i * 30 * 60000)), // Schedule matches 30 minutes apart
             });
           }
         }
@@ -55,6 +58,23 @@ const FootballFixtures = () => {
     });
   };
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'upcoming':
+        return '#4CAF50';
+      case 'in_progress':
+        return '#FFC107';
+      case 'completed':
+        return '#2196F3';
+      default:
+        return '#757575';
+    }
+  };
+
+  const formatDate = (date) => {
+    return new Date(date).toLocaleString();
+  };
+
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Knockout Fixtures</Text>
@@ -64,9 +84,21 @@ const FootballFixtures = () => {
           style={styles.matchCard}
           onPress={() => handleMatchPress(match)}
         >
+          <View style={styles.matchHeader}>
+            <Text style={styles.matchNumber}>Match {index + 1}</Text>
+            <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(match.status) }]} />
+          </View>
           <Text style={styles.matchText}>
             {match.teamA.teamName} vs {match.teamB.teamName}
           </Text>
+          <Text style={styles.scheduledTime}>
+            Scheduled: {formatDate(match.scheduledTime)}
+          </Text>
+          {match.status === 'completed' && (
+            <Text style={styles.scoreText}>
+              Score: {match.score.teamA} - {match.score.teamB}
+            </Text>
+          )}
         </TouchableOpacity>
       ))}
     </ScrollView>
@@ -96,8 +128,37 @@ const styles = StyleSheet.create({
     borderColor: '#333',
     borderWidth: 1,
   },
+  matchHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  matchNumber: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#666',
+  },
+  statusIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
   matchText: {
     fontSize: 22,
+    textAlign: 'center',
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  scheduledTime: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 5,
+  },
+  scoreText: {
+    fontSize: 18,
+    color: '#2196F3',
     textAlign: 'center',
     fontWeight: 'bold',
   },
