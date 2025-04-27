@@ -7,7 +7,7 @@ export default function Home() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Score Board App</Text>
+        <Text style={styles.title}>InScore</Text>
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
             style={styles.button} 
@@ -36,7 +36,7 @@ export default function Home() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#222',
+    backgroundColor: 'lightyellow',
   },
   content: {
     flex: 1,
@@ -45,11 +45,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   title: {
-    fontSize: 40,
+    fontSize: 70,
     fontWeight: 'bold',
-    color: 'gold',
-    marginBottom: 40,
+    color: '#fff',
+    marginBottom: 70,
     textAlign: 'center',
+    backgroundColor:'gold',
+    padding:20,
+    borderRadius:50
   },
   buttonContainer: {
     width: '100%',

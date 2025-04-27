@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView, Alert } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const FootballMatchscreen = () => {
+const FootballSingleMatchScreen = () => {
   const { match, duration } = useLocalSearchParams();
+  const router = useRouter();
   const parsedMatch = JSON.parse(match);
   const matchDuration = parseInt(duration); // in minutes
 
@@ -39,25 +40,20 @@ const FootballMatchscreen = () => {
   const [showAddedTimeModal, setShowAddedTimeModal] = useState(false);
   const [showStartSecondHalfModal, setShowStartSecondHalfModal] = useState(false);
 
+  // Add new state for draw options
+  const [showDrawOptionsModal, setShowDrawOptionsModal] = useState(false);
+
+  // Add new state for save match
+  const [showSaveMatchModal, setShowSaveMatchModal] = useState(false);
+
   // Load team players data
   useEffect(() => {
-    const loadTeamPlayers = async () => {
-      try {
-        const teamData = await AsyncStorage.getItem('footballTeamData');
-        if (teamData) {
-          const parsedData = JSON.parse(teamData);
-          const teamA = parsedData.find(team => team.teamName === parsedMatch.teamA.teamName);
-          const teamB = parsedData.find(team => team.teamName === parsedMatch.teamB.teamName);
-          
-          if (teamA) setTeamAPlayers(teamA.players);
-          if (teamB) setTeamBPlayers(teamB.players);
-        }
-      } catch (error) {
-        console.error('Error loading team players:', error);
-      }
-    };
-    loadTeamPlayers();
-  }, []);
+    // Get players directly from the parsed match data
+    if (parsedMatch && parsedMatch.teamA && parsedMatch.teamB) {
+      setTeamAPlayers(parsedMatch.teamA.players || []);
+      setTeamBPlayers(parsedMatch.teamB.players || []);
+    }
+  }, []); // Empty dependency array since we only need to set players once
 
   // Timer Logic
   useEffect(() => {
@@ -88,9 +84,11 @@ const FootballMatchscreen = () => {
           else if (phase === 'secondHalfAdded' && next >= totalSeconds + addedTime) {
             setIsRunning(false);
             setPhase('ended');
-            // Check if penalty shootout is needed
+            // Check if match is a draw
             if (teamAScore === teamBScore) {
-              setShowPenaltyModal(true);
+              setShowDrawOptionsModal(true);
+            } else {
+              handleMatchEnd();
             }
           }
 
@@ -100,7 +98,7 @@ const FootballMatchscreen = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isRunning, phase, addedTime]);
+  }, [isRunning, phase, addedTime, halftimeSeconds, totalSeconds, teamAScore, teamBScore]);
 
   const handleGoalA = () => {
     setCurrentScoringTeam('A');
@@ -195,21 +193,6 @@ const FootballMatchscreen = () => {
     }
   };
 
-  const checkPenaltyWinner = () => {
-    if (penaltyRound < 5) return false;
-    
-    const teamADiff = penaltyTeamAScore - penaltyTeamBScore;
-    const teamBDiff = penaltyTeamBScore - penaltyTeamAScore;
-    
-    // After 5 rounds, check if one team has more goals
-    if (teamADiff > 0 || teamBDiff > 0) {
-      return true;
-    }
-    
-    // If scores are equal, continue to next round
-    return false;
-  };
-
   const handleUndoPenalty = () => {
     if (penaltyHistory.length > 0) {
       const lastPenalty = penaltyHistory[penaltyHistory.length - 1];
@@ -294,6 +277,59 @@ const FootballMatchscreen = () => {
       if (teamBScore > teamAScore) return `${parsedMatch.teamB.teamName} Wins!`;
     }
     return 'Match Draw!';
+  };
+
+  const handleDrawOption = (option) => {
+    setShowDrawOptionsModal(false);
+    if (option === 'penalties') {
+      startPenaltyShootout();
+    } else {
+      // Conclude as draw
+      setPhase('ended');
+      handleMatchEnd();
+    }
+  };
+
+  const saveMatchResult = async () => {
+    try {
+      const matchResult = {
+        date: new Date().toISOString(),
+        teamA: parsedMatch.teamA.teamName,
+        teamB: parsedMatch.teamB.teamName,
+        score: {
+          teamA: teamAScore,
+          teamB: teamBScore
+        },
+        duration: matchDuration,
+        winner: getWinnerText(),
+        goalHistory: goalHistory,
+        penaltyShootout: isPenaltyShootout ? {
+          teamAScore: penaltyTeamAScore,
+          teamBScore: penaltyTeamBScore,
+          history: penaltyHistory
+        } : null
+      };
+
+      // Get existing history
+      const existingHistory = await AsyncStorage.getItem('footballSingleMatchHistory');
+      const history = existingHistory ? JSON.parse(existingHistory) : [];
+      
+      // Add new match result
+      history.push(matchResult);
+      
+      // Save updated history
+      await AsyncStorage.setItem('footballSingleMatchHistory', JSON.stringify(history));
+      
+      // Navigate back to footballSingle
+      router.push('/footballSingle');
+    } catch (error) {
+      console.error('Error saving match result:', error);
+      Alert.alert('Error', 'Failed to save match result');
+    }
+  };
+
+  const handleMatchEnd = () => {
+    setShowSaveMatchModal(true);
   };
 
   return (
@@ -485,11 +521,60 @@ const FootballMatchscreen = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Modal for Draw Options */}
+      <Modal visible={showDrawOptionsModal} transparent animationType="slide">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Match is a Draw!</Text>
+            <Text style={styles.modalSubtitle}>Choose an option:</Text>
+            <View style={styles.drawOptionsContainer}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.drawButton]} 
+                onPress={() => handleDrawOption('draw')}
+              >
+                <Text style={styles.buttonText}>Conclude as Draw</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.penaltiesButton]} 
+                onPress={() => handleDrawOption('penalties')}
+              >
+                <Text style={styles.buttonText}>Start Penalties</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal for Save Match */}
+      <Modal visible={showSaveMatchModal} transparent animationType="slide">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Match Ended!</Text>
+            <Text style={styles.modalSubtitle}>{getWinnerText()}</Text>
+            <Text style={styles.modalSubtitle}>Do you want to save this match result?</Text>
+            <View style={styles.drawOptionsContainer}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.drawButton]} 
+                onPress={() => router.push('/footballSingle')}
+              >
+                <Text style={styles.buttonText}>Don't Save</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.penaltiesButton]} 
+                onPress={saveMatchResult}
+              >
+                <Text style={styles.buttonText}>Save Result</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
 
-export default FootballMatchscreen;
+export default FootballSingleMatchScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -548,8 +633,8 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 150,
     marginTop: 5,
-    borderWidth: 0,
-    //borderColor: '#ddd',
+    borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 5,
   },
   goalScorer: {
@@ -704,4 +789,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
-});
+  drawOptionsContainer: {
+    width: '100%',
+    gap: 10,
+  },
+  drawButton: {
+    backgroundColor: '#666',
+  },
+  penaltiesButton: {
+    backgroundColor: '#4CAF50',
+  },
+}); 

@@ -11,9 +11,11 @@ const Football = () => {
           <Text style={styles.buttonText}>Tournament</Text>
         </TouchableOpacity>
       </Link>
+      <Link href="/footballSingle" asChild>
       <TouchableOpacity style={styles.button}>
         <Text style={styles.buttonText}>One-Off Match</Text>
       </TouchableOpacity>
+      </Link>
     </View>
   );
 };
