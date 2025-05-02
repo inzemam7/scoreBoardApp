@@ -18,6 +18,15 @@ const MatchScreen = () => {
     const [teamBName, setTeamBName] = useState(teamB);
     const [returnPath] = useState(isSingleMatch === 'true' ? '/cricSingle' : '/fixtures');
     const [historyKey] = useState(isSingleMatch === 'true' ? 'singleMatchHistory' : 'matchHistory');
+    const [teamPlayers, setTeamPlayers] = useState({});
+
+    // Add new state variables for players
+    const [teamAPlayers, setTeamAPlayers] = useState([]);
+    const [teamBPlayers, setTeamBPlayers] = useState([]);
+    const [currentBatter1, setCurrentBatter1] = useState(null);
+    const [currentBatter2, setCurrentBatter2] = useState(null);
+    const [currentBowler, setCurrentBowler] = useState(null);
+    const [showPlayerSelection, setShowPlayerSelection] = useState(false);
 
     const [inningsData, setInningsData] = useState([
         { score: 0, wickets: 0, balls: 0, history: [] },
@@ -34,6 +43,11 @@ const MatchScreen = () => {
     const [showLegByeOptions, setShowLegByeOptions] = useState(false);
 
     const extraRunOptions = [0, 1, 2, 3, 4, 5, 6];
+
+    // Add these new state variables at the top with other state declarations
+    const [showBatter1Dropdown, setShowBatter1Dropdown] = useState(false);
+    const [showBatter2Dropdown, setShowBatter2Dropdown] = useState(false);
+    const [showBowlerDropdown, setShowBowlerDropdown] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -61,6 +75,30 @@ const MatchScreen = () => {
                     setWinner(parsedMatchData.winner);
                     setIsMatchOver(true);
                     return;
+                }
+
+                // Fetch team setup data
+                const teamPlayersData = await AsyncStorage.getItem('teamPlayers');
+                const teamNamesData = await AsyncStorage.getItem('teamNamesInput');
+                
+                if (teamPlayersData && teamNamesData) {
+                    const players = JSON.parse(teamPlayersData);
+                    const teamNames = JSON.parse(teamNamesData);
+                    
+                    setTeamPlayers(players);
+                    
+                    // Get the correct team players based on team names
+                    const teamAKey = Object.keys(players).find(key => teamNames[key] === teamAName);
+                    const teamBKey = Object.keys(players).find(key => teamNames[key] === teamBName);
+                    
+                    const teamAPlayersList = teamAKey ? Object.values(players[teamAKey]) : [];
+                    const teamBPlayersList = teamBKey ? Object.values(players[teamBKey]) : [];
+                    
+                    console.log('Team A Players:', teamAPlayersList);
+                    console.log('Team B Players:', teamBPlayersList);
+                    
+                    setTeamAPlayers(teamAPlayersList);
+                    setTeamBPlayers(teamBPlayersList);
                 }
 
                 // Check if it's a single match
@@ -103,6 +141,24 @@ const MatchScreen = () => {
         const bowling = batting === teamAName ? teamBName : teamAName;
         setBattingTeam(batting);
         setBowlingTeam(bowling);
+        setShowPlayerSelection(true);
+    };
+
+    const handlePlayerSelection = () => {
+        if (!currentBatter1 || !currentBatter2 || !currentBowler) {
+            Alert.alert('Selection Required', 'Please select both batters and a bowler');
+            return;
+        }
+
+        // Check if any player is selected more than once
+        if (currentBatter1 === currentBatter2 || 
+            currentBatter1 === currentBowler || 
+            currentBatter2 === currentBowler) {
+            Alert.alert('Invalid Selection', 'A player cannot be selected more than once');
+            return;
+        }
+
+        setShowPlayerSelection(false);
     };
 
     const startSecondInnings = (isAllOut) => {
@@ -339,6 +395,136 @@ const MatchScreen = () => {
         );
     };
 
+    const renderPlayerSelection = () => {
+        // Get the correct team players based on batting/bowling
+        const battingTeamPlayers = battingTeam === teamAName ? teamAPlayers : teamBPlayers;
+        const bowlingTeamPlayers = bowlingTeam === teamAName ? teamAPlayers : teamBPlayers;
+
+        return (
+            <View style={styles.modalContainer}>
+                <View style={styles.modalContent}>
+                    <Text style={styles.modalTitle}>Select Players</Text>
+                    
+                    <Text style={styles.sectionTitle}>Select Batters:</Text>
+                    <View style={styles.playerSelection}>
+                        <View style={styles.playerColumn}>
+                            <Text style={styles.playerLabel}>Batter 1:</Text>
+                            <View style={styles.dropdownWrapper}>
+                                <TouchableOpacity 
+                                    style={styles.dropdownField}
+                                    onPress={() => {
+                                        setShowBatter2Dropdown(false);
+                                        setShowBowlerDropdown(false);
+                                        setShowBatter1Dropdown(!showBatter1Dropdown);
+                                    }}
+                                >
+                                    <Text style={styles.dropdownButtonText}>
+                                        {currentBatter1 || 'Select Batter 1'}
+                                    </Text>
+                                </TouchableOpacity>
+                                {showBatter1Dropdown && (
+                                    <View style={styles.dropdownList}>
+                                        <ScrollView nestedScrollEnabled={true}>
+                                            {battingTeamPlayers.map((player, index) => (
+                                                <TouchableOpacity
+                                                    key={`batter1-${index}`}
+                                                    style={styles.dropdownItem}
+                                                    onPress={() => {
+                                                        setCurrentBatter1(player);
+                                                        setShowBatter1Dropdown(false);
+                                                    }}
+                                                >
+                                                    <Text style={styles.dropdownItemText}>{player}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </ScrollView>
+                                    </View>
+                                )}
+                            </View>
+                        </View>
+                        
+                        <View style={styles.playerColumn}>
+                            <Text style={styles.playerLabel}>Batter 2:</Text>
+                            <View style={styles.dropdownWrapper}>
+                                <TouchableOpacity 
+                                    style={styles.dropdownField}
+                                    onPress={() => {
+                                        setShowBatter1Dropdown(false);
+                                        setShowBowlerDropdown(false);
+                                        setShowBatter2Dropdown(!showBatter2Dropdown);
+                                    }}
+                                >
+                                    <Text style={styles.dropdownButtonText}>
+                                        {currentBatter2 || 'Select Batter 2'}
+                                    </Text>
+                                </TouchableOpacity>
+                                {showBatter2Dropdown && (
+                                    <View style={styles.dropdownList}>
+                                        <ScrollView nestedScrollEnabled={true}>
+                                            {battingTeamPlayers.map((player, index) => (
+                                                <TouchableOpacity
+                                                    key={`batter2-${index}`}
+                                                    style={styles.dropdownItem}
+                                                    onPress={() => {
+                                                        setCurrentBatter2(player);
+                                                        setShowBatter2Dropdown(false);
+                                                    }}
+                                                >
+                                                    <Text style={styles.dropdownItemText}>{player}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </ScrollView>
+                                    </View>
+                                )}
+                            </View>
+                        </View>
+                    </View>
+
+                    <Text style={styles.sectionTitle}>Select Bowler:</Text>
+                    <View style={styles.dropdownWrapper}>
+                        <TouchableOpacity 
+                            style={styles.dropdownField}
+                            onPress={() => {
+                                setShowBatter1Dropdown(false);
+                                setShowBatter2Dropdown(false);
+                                setShowBowlerDropdown(!showBowlerDropdown);
+                            }}
+                        >
+                            <Text style={styles.dropdownButtonText}>
+                                {currentBowler || 'Select Bowler'}
+                            </Text>
+                        </TouchableOpacity>
+                        {showBowlerDropdown && (
+                            <View style={styles.dropdownList}>
+                                <ScrollView nestedScrollEnabled={true}>
+                                    {bowlingTeamPlayers.map((player, index) => (
+                                        <TouchableOpacity
+                                            key={`bowler-${index}`}
+                                            style={styles.dropdownItem}
+                                            onPress={() => {
+                                                setCurrentBowler(player);
+                                                setShowBowlerDropdown(false);
+                                            }}
+                                        >
+                                            <Text style={styles.dropdownItemText}>{player}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
+                    </View>
+
+                    <TouchableOpacity 
+                        style={styles.confirmButton}
+                        onPress={handlePlayerSelection}
+                    >
+                        <Text style={styles.confirmButtonText}>Confirm Selection</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        );
+    };
+
     return (
         <ScrollView style={styles.container}>
             <View style={styles.header}>
@@ -428,18 +614,24 @@ const MatchScreen = () => {
                             </TouchableOpacity>
                             {showWideOptions && (
                                 <View style={styles.optionsContainer}>
-                                    {extraRunOptions.map((runs) => (
-                                        <TouchableOpacity
-                                            key={`wide${runs}`}
-                                            style={styles.optionButton}
-                                            onPress={() => {
-                                                updateBall(runs + 1, true, false, 'wide');
-                                                setShowWideOptions(false);
-                                            }}
-                                        >
-                                            <Text style={styles.optionText}>Wide + {runs}</Text>
-                                        </TouchableOpacity>
-                                    ))}
+                                    <ScrollView 
+                                        style={styles.optionsScrollView} 
+                                        nestedScrollEnabled={true}
+                                        showsVerticalScrollIndicator={true}
+                                    >
+                                        {extraRunOptions.map((runs) => (
+                                            <TouchableOpacity
+                                                key={`wide${runs}`}
+                                                style={styles.optionButton}
+                                                onPress={() => {
+                                                    updateBall(runs + 1, true, false, 'wide');
+                                                    setShowWideOptions(false);
+                                                }}
+                                            >
+                                                <Text style={styles.optionText}>Wide + {runs}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
                                 </View>
                             )}
                         </View>
@@ -454,18 +646,24 @@ const MatchScreen = () => {
                             </TouchableOpacity>
                             {showNoBallOptions && (
                                 <View style={styles.optionsContainer}>
-                                    {extraRunOptions.map((runs) => (
-                                        <TouchableOpacity
-                                            key={`noball${runs}`}
-                                            style={styles.optionButton}
-                                            onPress={() => {
-                                                updateBall(runs + 1, true, false, 'noball');
-                                                setShowNoBallOptions(false);
-                                            }}
-                                        >
-                                            <Text style={styles.optionText}>No Ball + {runs}</Text>
-                                        </TouchableOpacity>
-                                    ))}
+                                    <ScrollView 
+                                        style={styles.optionsScrollView} 
+                                        nestedScrollEnabled={true}
+                                        showsVerticalScrollIndicator={true}
+                                    >
+                                        {extraRunOptions.map((runs) => (
+                                            <TouchableOpacity
+                                                key={`noball${runs}`}
+                                                style={styles.optionButton}
+                                                onPress={() => {
+                                                    updateBall(runs + 1, true, false, 'noball');
+                                                    setShowNoBallOptions(false);
+                                                }}
+                                            >
+                                                <Text style={styles.optionText}>No Ball + {runs}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
                                 </View>
                             )}
                         </View>
@@ -480,24 +678,32 @@ const MatchScreen = () => {
                             </TouchableOpacity>
                             {showLegByeOptions && (
                                 <View style={styles.optionsContainer}>
-                                    {extraRunOptions.map((runs) => (
-                                        <TouchableOpacity
-                                            key={`legbye${runs}`}
-                                            style={styles.optionButton}
-                                            onPress={() => {
-                                                updateBall(runs, true, false, 'legbye');
-                                                setShowLegByeOptions(false);
-                                            }}
-                                        >
-                                            <Text style={styles.optionText}>Leg Bye + {runs}</Text>
-                                        </TouchableOpacity>
-                                    ))}
+                                    <ScrollView 
+                                        style={styles.optionsScrollView} 
+                                        nestedScrollEnabled={true}
+                                        showsVerticalScrollIndicator={true}
+                                    >
+                                        {extraRunOptions.map((runs) => (
+                                            <TouchableOpacity
+                                                key={`legbye${runs}`}
+                                                style={styles.optionButton}
+                                                onPress={() => {
+                                                    updateBall(runs, true, false, 'legbye');
+                                                    setShowLegByeOptions(false);
+                                                }}
+                                            >
+                                                <Text style={styles.optionText}>Leg Bye + {runs}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
                                 </View>
                             )}
                         </View>
                     </View>
                 </>
             )}
+
+            {showPlayerSelection && renderPlayerSelection()}
         </ScrollView>
     );
 };
@@ -540,6 +746,8 @@ const styles = StyleSheet.create({
   extraColumn: {
     flex: 1,
     marginHorizontal: 5,
+    position: 'relative',
+    zIndex: 1,
   },
   extraTitle: {
     color: '#ccc',
@@ -563,6 +771,12 @@ const styles = StyleSheet.create({
     marginTop: 5,
     zIndex: 1000,
     elevation: 5,
+    height: 200,
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  optionsScrollView: {
+    flex: 1,
   },
   optionButton: {
     padding: 10,
@@ -572,5 +786,118 @@ const styles = StyleSheet.create({
   optionText: {
     color: 'white',
     textAlign: 'center',
+  },
+  modalContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  modalContent: {
+    backgroundColor: '#333',
+    padding: 20,
+    borderRadius: 10,
+    width: '90%',
+    maxHeight: '80%',
+    zIndex: 10000,
+  },
+  modalTitle: {
+    fontSize: 24,
+    color: 'gold',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    color: 'white',
+    marginBottom: 10,
+  },
+  playerSelection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    gap: 10,
+    position: 'relative',
+    zIndex: 10003,
+  },
+  playerColumn: {
+    flex: 1,
+    position: 'relative',
+    zIndex: 10003,
+  },
+  playerLabel: {
+    color: '#ccc',
+    fontSize: 16,
+    marginBottom: 8,
+    fontWeight: 'bold',
+  },
+  dropdownWrapper: {
+    position: 'relative',
+    zIndex: 10003,
+  },
+  dropdownField: {
+    backgroundColor: '#444',
+    padding: 15,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#666',
+    minHeight: 50,
+    justifyContent: 'center',
+    marginBottom: 5,
+  },
+  dropdownButtonText: {
+    color: 'white',
+    fontSize: 18,
+    textAlign: 'center',
+  },
+  dropdownList: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: '#333',
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#666',
+    maxHeight: 200,
+    zIndex: 10004,
+    elevation: 5,
+    marginTop: 5,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  dropdownItem: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#444',
+  },
+  dropdownItemText: {
+    color: 'white',
+    fontSize: 18,
+    textAlign: 'center',
+  },
+  confirmButton: {
+    backgroundColor: '#4CAF50',
+    padding: 15,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginTop: 20,
+    position: 'relative',
+    zIndex: 10001,
+  },
+  confirmButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

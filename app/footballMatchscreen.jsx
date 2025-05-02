@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView, Alert } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const FootballMatchscreen = () => {
   const { match, duration } = useLocalSearchParams();
+  const router = useRouter();
   const parsedMatch = JSON.parse(match);
   const matchDuration = parseInt(duration); // in minutes
 
@@ -38,6 +39,9 @@ const FootballMatchscreen = () => {
   const [addedTime, setAddedTime] = useState(0);
   const [showAddedTimeModal, setShowAddedTimeModal] = useState(false);
   const [showStartSecondHalfModal, setShowStartSecondHalfModal] = useState(false);
+
+  const [showSaveMatchModal, setShowSaveMatchModal] = useState(false);
+  const [matchResult, setMatchResult] = useState(null);
 
   // Load team players data
   useEffect(() => {
@@ -91,6 +95,8 @@ const FootballMatchscreen = () => {
             // Check if penalty shootout is needed
             if (teamAScore === teamBScore) {
               setShowPenaltyModal(true);
+            } else {
+              handleMatchEnd();
             }
           }
 
@@ -149,7 +155,8 @@ const FootballMatchscreen = () => {
 
     // Check if round is complete
     if (currentPenaltyTeam === 'B') {
-      setPenaltyRound((prev) => prev + 1);
+      const nextRound = penaltyRound + 1;
+      setPenaltyRound(nextRound);
       
       // Check for winner in sudden death (after round 5)
       if (penaltyRound >= 5) {
@@ -157,9 +164,10 @@ const FootballMatchscreen = () => {
         const teamBTotal = penaltyTeamBScore + (team === 'B' ? 1 : 0);
         
         // In sudden death, if both teams have taken their shots and one team leads
-        if (currentPenaltyTeam === 'B' && teamATotal !== teamBTotal) {
+        if (teamATotal !== teamBTotal) {
           setIsPenaltyShootout(false);
           setShowPenaltyModal(false);
+          handleMatchEnd(); // Call handleMatchEnd when penalty shootout is complete
         }
       }
     }
@@ -179,22 +187,24 @@ const FootballMatchscreen = () => {
 
     // Check if round is complete
     if (currentPenaltyTeam === 'B') {
-      setPenaltyRound((prev) => prev + 1);
+      const nextRound = penaltyRound + 1;
+      setPenaltyRound(nextRound);
       
       // Check for winner in sudden death (after round 5)
       if (penaltyRound >= 5) {
-        // If team A missed and team B scored in the same round
         const teamATotal = penaltyTeamAScore;
-        const teamBTotal = penaltyTeamBScore + (team === 'B' ? 0 : 1); // Add 1 if other team scored
+        const teamBTotal = penaltyTeamBScore + (team === 'B' ? 0 : 1);
         
-        if (currentPenaltyTeam === 'B' && teamATotal !== teamBTotal) {
+        if (teamATotal !== teamBTotal) {
           setIsPenaltyShootout(false);
           setShowPenaltyModal(false);
+          handleMatchEnd(); // Call handleMatchEnd when penalty shootout is complete
         }
       }
     }
   };
 
+  // Add a new function to check penalty winner
   const checkPenaltyWinner = () => {
     if (penaltyRound < 5) return false;
     
@@ -203,12 +213,21 @@ const FootballMatchscreen = () => {
     
     // After 5 rounds, check if one team has more goals
     if (teamADiff > 0 || teamBDiff > 0) {
+      setIsPenaltyShootout(false);
+      setShowPenaltyModal(false);
+      handleMatchEnd();
       return true;
     }
     
-    // If scores are equal, continue to next round
     return false;
   };
+
+  // Add useEffect to check for penalty winner
+  useEffect(() => {
+    if (isPenaltyShootout && penaltyRound > 5) {
+      checkPenaltyWinner();
+    }
+  }, [penaltyRound, penaltyTeamAScore, penaltyTeamBScore]);
 
   const handleUndoPenalty = () => {
     if (penaltyHistory.length > 0) {
@@ -294,6 +313,67 @@ const FootballMatchscreen = () => {
       if (teamBScore > teamAScore) return `${parsedMatch.teamB.teamName} Wins!`;
     }
     return 'Match Draw!';
+  };
+
+  const handleMatchEnd = () => {
+    if (showSaveMatchModal) return; // Prevent multiple calls
+    
+    const result = {
+      teamA: parsedMatch.teamA.teamName,
+      teamB: parsedMatch.teamB.teamName,
+      score: {
+        teamA: teamAScore,
+        teamB: teamBScore
+      },
+      winner: getWinnerText(),
+      goalHistory: goalHistory,
+      penaltyShootout: isPenaltyShootout ? {
+        teamAScore: penaltyTeamAScore,
+        teamBScore: penaltyTeamBScore,
+        history: penaltyHistory
+      } : null,
+      date: new Date().toISOString(),
+      round: parseInt(parsedMatch.round) || 1,
+      isReplay: parsedMatch.isReplay || false // Add isReplay flag
+    };
+    setMatchResult(result);
+    setShowSaveMatchModal(true);
+  };
+
+  const saveMatchResult = async () => {
+    try {
+      // Save match result to AsyncStorage
+      const existingHistory = await AsyncStorage.getItem('footballMatchHistory');
+      const history = existingHistory ? JSON.parse(existingHistory) : [];
+      history.push(matchResult);
+      await AsyncStorage.setItem('footballMatchHistory', JSON.stringify(history));
+      
+      // If this is a replay match, update the original match's status
+      if (matchResult.isReplay) {
+        const fixturesData = await AsyncStorage.getItem('footballFixtures');
+        if (fixturesData) {
+          const fixtures = JSON.parse(fixturesData);
+          const updatedFixtures = fixtures.map(fixture => {
+            if (fixture.teamA.teamName === matchResult.teamA && fixture.teamB.teamName === matchResult.teamB) {
+              return {
+                ...fixture,
+                status: 'completed',
+                score: matchResult.score,
+                winner: matchResult.winner
+              };
+            }
+            return fixture;
+          });
+          await AsyncStorage.setItem('footballFixtures', JSON.stringify(updatedFixtures));
+        }
+      }
+      
+      // Navigate back to fixtures
+      router.push('/footballFixtures');
+    } catch (error) {
+      console.error('Error saving match result:', error);
+      Alert.alert('Error', 'Failed to save match result');
+    }
   };
 
   return (
@@ -485,6 +565,32 @@ const FootballMatchscreen = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Modal for Save Match */}
+      <Modal visible={showSaveMatchModal} transparent animationType="slide">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Match Ended!</Text>
+            <Text style={styles.modalSubtitle}>{getWinnerText()}</Text>
+            <Text style={styles.modalSubtitle}>Do you want to save this match result?</Text>
+            <View style={styles.drawOptionsContainer}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.drawButton]} 
+                onPress={() => router.push('/footballFixtures')}
+              >
+                <Text style={styles.buttonText}>Don't Save</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.penaltiesButton]} 
+                onPress={saveMatchResult}
+              >
+                <Text style={styles.buttonText}>Save Result</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -548,8 +654,8 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 150,
     marginTop: 5,
-    borderWidth: 0,
-    //borderColor: '#ddd',
+    borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 5,
   },
   goalScorer: {
@@ -703,5 +809,17 @@ const styles = StyleSheet.create({
   playerButtonText: {
     fontSize: 16,
     color: '#333',
+  },
+  drawOptionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: 20,
+  },
+  drawButton: {
+    backgroundColor: '#666',
+  },
+  penaltiesButton: {
+    backgroundColor: '#4CAF50',
   },
 });
