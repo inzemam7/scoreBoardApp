@@ -40,15 +40,17 @@ const TeamSetup = () => {
   };
 
   const isFormValid = () => {
-    for (const team in teamPlayers) {
+    for (const team of teamNames) {
       if (!teamNamesInput[team]) {
         return false;
       }
-      if (!teamPlayers[team] || Object.keys(teamPlayers[team]).length !== 1) {
+      if (!teamPlayers[team] || Object.keys(teamPlayers[team]).length !== 11) {
         return false;
       }
-      if (!teamPlayers[team][0]) {
-        return false;
+      for (let i = 0; i < 11; i++) {
+        if (!teamPlayers[team][i]) {
+          return false;
+        }
       }
     }
     return true;
@@ -96,12 +98,16 @@ const TeamSetup = () => {
                 onChangeText={(text) => handleTeamNameChange(team, text)}
                 value={teamNamesInput[team] || ''}
               />
-              <TextInput
-                style={styles.playerInput}
-                placeholder="Player Name"
-                onChangeText={(text) => handlePlayerChange(team, 0, text)}
-                value={teamPlayers[team] ? teamPlayers[team][0] : ''}
-              />
+              {/* Render 11 player inputs */}
+              {Array.from({ length: 11 }, (_, idx) => (
+                <TextInput
+                  key={idx}
+                  style={styles.playerInput}
+                  placeholder={`Player ${idx + 1} Name`}
+                  onChangeText={(text) => handlePlayerChange(team, idx, text)}
+                  value={teamPlayers[team] ? teamPlayers[team][idx] || '' : ''}
+                />
+              ))}
             </View>
           )}
         </View>
