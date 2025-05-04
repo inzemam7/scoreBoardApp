@@ -48,6 +48,15 @@ const MatchScreen = () => {
     const [showBatter1Dropdown, setShowBatter1Dropdown] = useState(false);
     const [showBatter2Dropdown, setShowBatter2Dropdown] = useState(false);
     const [showBowlerDropdown, setShowBowlerDropdown] = useState(false);
+    const [showNewBatterPopup, setShowNewBatterPopup] = useState(false);
+    const [showNewBowlerPopup, setShowNewBowlerPopup] = useState(false);
+
+    const [outBatsmen, setOutBatsmen] = useState([]);
+
+    const [onStrike, setOnStrike] = useState('batter1'); // 'batter1' or 'batter2'
+
+    const [batterStats, setBatterStats] = useState({ batter1: { runs: 0, balls: 0 }, batter2: { runs: 0, balls: 0 } });
+    const [bowlerStats, setBowlerStats] = useState({});
 
     useEffect(() => {
         const fetchData = async () => {
@@ -172,9 +181,13 @@ const MatchScreen = () => {
             Alert.alert('1st Innings Over', `${bowlingTeam} needs ${targetScore} runs to win.`);
         }
 
+        // Switch batting and bowling teams
         setBattingTeam(bowlingTeam);
         setBowlingTeam(battingTeam);
         setCurrentInning(2);
+
+        // Show player selection popups at the start of the second inning
+        setShowPlayerSelection(true);
     };
 
     const saveMatchToHistory = async (matchData) => {
@@ -287,19 +300,70 @@ const MatchScreen = () => {
             newData[inningIndex].wickets += 1;
             newData[inningIndex].balls += 1;
             historyEntry.type = 'wicket';
+            setOutBatsmen([...outBatsmen, currentBatter1]);
+            setShowNewBatterPopup(true);
+            setBowlerStats(prev => ({
+                ...prev,
+                [currentBowler]: {
+                    ...prev[currentBowler],
+                    wickets: (prev[currentBowler]?.wickets || 0) + 1,
+                    balls: (prev[currentBowler]?.balls || 0) + 1
+                }
+            }));
         } else if (extra) {
             newData[inningIndex].score += runs;
             historyEntry.type = extraType || 'extra';
             historyEntry.runs = runs;
-            // Only count the ball for leg byes
             if (extraType === 'legbye') {
                 newData[inningIndex].balls += 1;
+                setBowlerStats(prev => ({
+                    ...prev,
+                    [currentBowler]: {
+                        ...prev[currentBowler],
+                        balls: (prev[currentBowler]?.balls || 0) + 1
+                    }
+                }));
             }
+            setBowlerStats(prev => ({
+                ...prev,
+                [currentBowler]: {
+                    ...prev[currentBowler],
+                    runs: (prev[currentBowler]?.runs || 0) + runs
+                }
+            }));
         } else {
             newData[inningIndex].score += runs;
             historyEntry.type = 'run';
             historyEntry.runs = runs;
             newData[inningIndex].balls += 1;
+
+            // Update batter stats
+            if (onStrike === 'batter1') {
+                setBatterStats(prev => ({
+                    ...prev,
+                    batter1: { runs: prev.batter1.runs + runs, balls: prev.batter1.balls + 1 }
+                }));
+            } else {
+                setBatterStats(prev => ({
+                    ...prev,
+                    batter2: { runs: prev.batter2.runs + runs, balls: prev.batter2.balls + 1 }
+                }));
+            }
+
+            // Update bowler stats
+            setBowlerStats(prev => ({
+                ...prev,
+                [currentBowler]: {
+                    ...prev[currentBowler],
+                    runs: (prev[currentBowler]?.runs || 0) + runs,
+                    balls: (prev[currentBowler]?.balls || 0) + 1
+                }
+            }));
+
+            // Rotate strike if odd number of runs
+            if (runs % 2 !== 0) {
+                setOnStrike(onStrike === 'batter1' ? 'batter2' : 'batter1');
+            }
         }
 
         newData[inningIndex].history.push(historyEntry);
@@ -327,6 +391,12 @@ const MatchScreen = () => {
                 endMatch(matchWinner);
             }
             return;
+        }
+
+        // Rotate strike after every over
+        if (balls % 6 === 0) {
+            setOnStrike(onStrike === 'batter1' ? 'batter2' : 'batter1');
+            setShowNewBowlerPopup(true);
         }
 
         setInningsData(newData);
@@ -525,6 +595,99 @@ const MatchScreen = () => {
         );
     };
 
+    const renderNewBatterPopup = () => {
+        const battingTeamPlayers = battingTeam === teamAName ? teamAPlayers : teamBPlayers;
+        const availablePlayers = battingTeamPlayers.filter(player => !outBatsmen.includes(player) && player !== currentBatter1 && player !== currentBatter2);
+        return (
+            <View style={styles.modalContainer}>
+                <View style={styles.modalContent}>
+                    <Text style={styles.modalTitle}>Select New Batter</Text>
+                    <View style={styles.dropdownWrapper}>
+                        <TouchableOpacity 
+                            style={styles.dropdownField}
+                            onPress={() => setShowBatter1Dropdown(!showBatter1Dropdown)}
+                        >
+                            <Text style={styles.dropdownButtonText}>
+                                {currentBatter1 || 'Select New Batter'}
+                            </Text>
+                        </TouchableOpacity>
+                        {showBatter1Dropdown && (
+                            <View style={styles.dropdownList}>
+                                <ScrollView nestedScrollEnabled={true}>
+                                    {availablePlayers.map((player, index) => (
+                                        <TouchableOpacity
+                                            key={`newbatter-${index}`}
+                                            style={styles.dropdownItem}
+                                            onPress={() => {
+                                                setCurrentBatter1(player);
+                                                setBatterStats(prev => ({ ...prev, batter1: { runs: 0, balls: 0 } }));
+                                                setShowBatter1Dropdown(false);
+                                                setShowNewBatterPopup(false);
+                                            }}
+                                        >
+                                            <Text style={styles.dropdownItemText}>{player}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
+                    </View>
+                </View>
+            </View>
+        );
+    };
+
+    const renderNewBowlerPopup = () => {
+        const bowlingTeamPlayers = bowlingTeam === teamAName ? teamAPlayers : teamBPlayers;
+        return (
+            <View style={styles.modalContainer}>
+                <View style={styles.modalContent}>
+                    <Text style={styles.modalTitle}>Select New Bowler</Text>
+                    <View style={styles.dropdownWrapper}>
+                        <TouchableOpacity 
+                            style={styles.dropdownField}
+                            onPress={() => setShowBowlerDropdown(!showBowlerDropdown)}
+                        >
+                            <Text style={styles.dropdownButtonText}>
+                                {currentBowler || 'Select New Bowler'}
+                            </Text>
+                        </TouchableOpacity>
+                        {showBowlerDropdown && (
+                            <View style={styles.dropdownList}>
+                                <ScrollView nestedScrollEnabled={true}>
+                                    {bowlingTeamPlayers.map((player, index) => (
+                                        <TouchableOpacity
+                                            key={`newbowler-${index}`}
+                                            style={styles.dropdownItem}
+                                            onPress={() => {
+                                                setCurrentBowler(player);
+                                                // Only initialize stats if the bowler hasn't bowled before
+                                                if (!bowlerStats[player]) {
+                                                    setBowlerStats(prev => ({
+                                                        ...prev,
+                                                        [player]: { runs: 0, wickets: 0, balls: 0 }
+                                                    }));
+                                                }
+                                                setShowBowlerDropdown(false);
+                                                setShowNewBowlerPopup(false);
+                                            }}
+                                        >
+                                            <Text style={styles.dropdownItemText}>
+                                                {player} {bowlerStats[player] ? 
+                                                    `(${bowlerStats[player].wickets}/${bowlerStats[player].runs} in ${Math.floor(bowlerStats[player].balls/6)}.${bowlerStats[player].balls%6})` 
+                                                    : ''}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
+                    </View>
+                </View>
+            </View>
+        );
+    };
+
     return (
         <ScrollView style={styles.container}>
             <View style={styles.header}>
@@ -576,7 +739,7 @@ const MatchScreen = () => {
                     </Text>
 
                     {currentInning === 2 && target && (
-                        <Text style={styles.targetText}>🎯 Target: {target}</Text>
+                        <Text style={styles.targetText}>Target: {target}</Text>
                     )}
 
                     {renderInningsSummary()}
@@ -588,6 +751,21 @@ const MatchScreen = () => {
                         <Text style={styles.scoreText}>
                             Overs: {overs}.{currentBall} / {oversLimit}
                         </Text>
+                        <View style={styles.playerInfoContainer}>
+                            <View style={styles.battersContainer}>
+                                <Text style={styles.playerInfo}>
+                                    Batter1: {currentBatter1} {onStrike === 'batter1' ? '•' : ''} - {batterStats.batter1.runs}({batterStats.batter1.balls})
+                                </Text>
+                                <Text style={styles.playerInfo}>
+                                    Batter2: {currentBatter2} {onStrike === 'batter2' ? '•' : ''} - {batterStats.batter2.runs}({batterStats.batter2.balls})
+                                </Text>
+                            </View>
+                            <View style={styles.bowlerContainer}>
+                                <Text style={styles.playerInfo}>
+                                    Bowler: {currentBowler} - {bowlerStats[currentBowler]?.wickets || 0}/{bowlerStats[currentBowler]?.runs || 0} ({Math.floor((bowlerStats[currentBowler]?.balls || 0) / 6)}.{(bowlerStats[currentBowler]?.balls || 0) % 6})
+                                </Text>
+                            </View>
+                        </View>
                     </View>
 
                     <Text style={styles.chooseText}>Choose Outcome:</Text>
@@ -704,6 +882,8 @@ const MatchScreen = () => {
             )}
 
             {showPlayerSelection && renderPlayerSelection()}
+            {showNewBatterPopup && renderNewBatterPopup()}
+            {showNewBowlerPopup && renderNewBowlerPopup()}
         </ScrollView>
     );
 };
@@ -774,9 +954,12 @@ const styles = StyleSheet.create({
     height: 200,
     borderWidth: 1,
     borderColor: '#444',
+    overflow: 'hidden',
   },
   optionsScrollView: {
     flex: 1,
+    maxHeight: 200,
+    showsVerticalScrollIndicator: true,
   },
   optionButton: {
     padding: 10,
@@ -875,6 +1058,7 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
+    overflow: 'hidden',
   },
   dropdownItem: {
     padding: 15,
@@ -899,5 +1083,22 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  playerInfoContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  battersContainer: {
+    alignItems: 'flex-start',
+  },
+  bowlerContainer: {
+    alignItems: 'flex-end',
+  },
+  playerInfo: {
+    color: 'white',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 5,
   },
 });
