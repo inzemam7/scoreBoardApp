@@ -61,7 +61,7 @@ const FootballMatchscreen = () => {
       }
     };
     loadTeamPlayers();
-  }, []);
+  }, [parsedMatch]);
 
   // Timer Logic
   useEffect(() => {
@@ -309,10 +309,15 @@ const FootballMatchscreen = () => {
       if (penaltyTeamBScore > penaltyTeamAScore) {
         return `${parsedMatch.teamB.teamName} Wins on Penalties (${penaltyTeamBScore}-${penaltyTeamAScore})!`;
       }
-      if (teamAScore > teamBScore) return `${parsedMatch.teamA.teamName} Wins!`;
-      if (teamBScore > teamAScore) return `${parsedMatch.teamB.teamName} Wins!`;
+      if (teamAScore > teamBScore) {
+        return `${parsedMatch.teamA.teamName} Wins!`;
+      }
+      if (teamBScore > teamAScore) {
+        return `${parsedMatch.teamB.teamName} Wins!`;
+      }
+      return 'Match Draw!';
     }
-    return 'Match Draw!';
+    return '';
   };
 
   const handleMatchEnd = () => {
@@ -334,7 +339,7 @@ const FootballMatchscreen = () => {
       } : null,
       date: new Date().toISOString(),
       round: parseInt(parsedMatch.round) || 1,
-      isReplay: parsedMatch.isReplay || false // Add isReplay flag
+      isReplay: parsedMatch.isReplay || false
     };
     setMatchResult(result);
     setShowSaveMatchModal(true);
@@ -811,13 +816,14 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   drawOptionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: 'column',
+    justifyContent: 'center',
     width: '100%',
     marginTop: 20,
   },
   drawButton: {
     backgroundColor: '#666',
+    marginBottom: 10,
   },
   penaltiesButton: {
     backgroundColor: '#4CAF50',

@@ -30,7 +30,7 @@ export default function Cricket() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#222',
+    backgroundColor: 'lightyellow',
   },
   content: {
     flex: 1,

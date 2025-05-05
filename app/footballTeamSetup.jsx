@@ -10,7 +10,7 @@ const FootballTeamSetup = () => {
   const [expandedTeams, setExpandedTeams] = useState({});
   const router = useRouter();
 
-  const playersPerTeam = 11; // 11 players 
+  const playersPerTeam = 1; // 11 players 
 
   useEffect(() => {
     async function fetchData() {
@@ -36,34 +36,44 @@ const FootballTeamSetup = () => {
   };
 
   const handleTeamSubmit = async () => {
-    let isAnyFieldEmpty = false;
-
-    for (const team of teamNames) {
-      if (!teamNamesInput[team] || !teamPlayers[team]) {
-        isAnyFieldEmpty = true;
-        break;
-      }
-      for (let i = 0; i < playersPerTeam; i++) {
-        if (!teamPlayers[team][i]) {
+    try {
+      // Validate all teams and players first
+      let isAnyFieldEmpty = false;
+      
+      for (const team of teamNames) {
+        if (!teamNamesInput[team] || !teamPlayers[team]) {
           isAnyFieldEmpty = true;
           break;
         }
+        for (let i = 0; i < playersPerTeam; i++) {
+          if (!teamPlayers[team][i]) {
+            isAnyFieldEmpty = true;
+            break;
+          }
+        }
       }
+  
+      if (isAnyFieldEmpty) {
+        Alert.alert('Missing Info', 'Please fill all team names and all 11 player fields.');
+        return;
+      }
+  
+      // Prepare team data in the correct format
+      const teamData = teamNames.map(teamKey => ({
+        teamName: teamNamesInput[teamKey],
+        players: Object.values(teamPlayers[teamKey])
+      }));
+  
+      // Save data
+      await AsyncStorage.setItem('footballTeamData', JSON.stringify(teamData));
+      
+      // Navigate to fixtures screen
+      router.replace('/footballFixtures');
+      
+    } catch (error) {
+      console.error('Error saving team data:', error);
+      Alert.alert('Error', 'Failed to save team data');
     }
-
-    if (isAnyFieldEmpty) {
-      Alert.alert('Missing Info', 'Please fill all team names and all 11 player fields.', [{ text: 'OK' }]);
-      return;
-    }
-
-    const combinedTeamData = teamNames.map(teamKey => ({
-      teamKey,
-      teamName: teamNamesInput[teamKey],
-      players: Object.values(teamPlayers[teamKey]),
-    }));
-
-    await AsyncStorage.setItem('footballTeamData', JSON.stringify(combinedTeamData));
-    router.push('/footballFixtures');
   };
 
   if (!tournamentData) {
