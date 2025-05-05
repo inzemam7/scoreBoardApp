@@ -186,6 +186,9 @@ const MatchScreen = () => {
         setBowlingTeam(battingTeam);
         setCurrentInning(2);
 
+        // Reset batter stats for new batters
+        setBatterStats({ batter1: { runs: 0, balls: 0 }, batter2: { runs: 0, balls: 0 } });
+
         // Show player selection popups at the start of the second inning
         setShowPlayerSelection(true);
     };
@@ -1048,8 +1051,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#666',
     maxHeight: 200,
-    zIndex: 10004,
-    elevation: 5,
+    zIndex: 99999,
+    elevation: 20,
     marginTop: 5,
     shadowColor: '#000',
     shadowOffset: {
