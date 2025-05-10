@@ -118,16 +118,11 @@ const MatchScreen = () => {
                     setTeamBPlayers(teamBPlayersList);
                 }
 
-                // Check if it's a single match
-                const singleMatchData = await AsyncStorage.getItem('currentMatchData');
-                if (singleMatchData) {
-                    const parsed = JSON.parse(singleMatchData);
-                    setOversLimit(parseInt(parsed.overs));
-                } else {
-                    // Tournament match
-                    const tournamentData = await AsyncStorage.getItem('cricTournamentSetup');
-                    if (tournamentData) {
-                        const parsed = JSON.parse(tournamentData);
+                // Fetch tournament setup data for overs
+                const tournamentData = await AsyncStorage.getItem('cricTournamentSetup');
+                if (tournamentData) {
+                    const parsed = JSON.parse(tournamentData);
+                    if (parsed.overs) {
                         setOversLimit(parseInt(parsed.overs));
                     }
                 }
@@ -332,23 +327,23 @@ const MatchScreen = () => {
                 // Add ball to batsman's stats but not runs
                 if (onStrike === 'batter1') {
                     setBatterStats(prev => ({
-                    ...prev,
+                        ...prev,
                         batter1: { ...prev.batter1, balls: prev.batter1.balls + 1 }
                     }));
                 } else {
                     setBatterStats(prev => ({
                         ...prev,
                         batter2: { ...prev.batter2, balls: prev.batter2.balls + 1 }
-                }));
-            }
+                    }));
+                }
                 // Change strike if odd number of runs
                 if (runs % 2 !== 0) {
                     setOnStrike(onStrike === 'batter1' ? 'batter2' : 'batter1');
                 }
             } else if (extraType === 'wide' || extraType === 'noball') {
-                // For wides and no balls, consider total runs (including extra run) for strike rotation
-                const totalRuns = runs + 1; // Add 1 for the extra run
-                if (totalRuns % 2 === 0) {
+                // For wides and no balls, consider only the additional runs (not the extra run) for strike rotation
+                const additionalRuns = runs - 1; // Subtract 1 to get only the additional runs
+                if (additionalRuns % 2 !== 0) {
                     setOnStrike(onStrike === 'batter1' ? 'batter2' : 'batter1');
                 }
             }
@@ -453,11 +448,94 @@ const MatchScreen = () => {
         if (last.type === 'run') {
             newData[inningIndex].score -= last.runs;
             newData[inningIndex].balls -= 1;
+            
+            // First undo strike rotation if it was an odd number of runs
+            if (last.runs % 2 !== 0) {
+                setOnStrike(onStrike === 'batter1' ? 'batter2' : 'batter1');
+            }
+
+            // Then undo batter stats based on the original strike
+            const originalStrike = last.runs % 2 !== 0 ? (onStrike === 'batter1' ? 'batter2' : 'batter1') : onStrike;
+            
+            if (originalStrike === 'batter1') {
+                setBatterStats(prev => ({
+                    ...prev,
+                    batter1: { 
+                        runs: Math.max(0, prev.batter1.runs - last.runs), 
+                        balls: Math.max(0, prev.batter1.balls - 1) 
+                    }
+                }));
+            } else {
+                setBatterStats(prev => ({
+                    ...prev,
+                    batter2: { 
+                        runs: Math.max(0, prev.batter2.runs - last.runs), 
+                        balls: Math.max(0, prev.batter2.balls - 1) 
+                    }
+                }));
+            }
+
+            // Undo bowler stats
+            setBowlerStats(prev => ({
+                ...prev,
+                [currentBowler]: {
+                    ...prev[currentBowler],
+                    runs: Math.max(0, prev[currentBowler].runs - last.runs),
+                    balls: Math.max(0, prev[currentBowler].balls - 1)
+                }
+            }));
         } else if (last.type === 'extra') {
             newData[inningIndex].score -= last.runs;
+            
+            if (last.type === 'legbye') {
+                newData[inningIndex].balls -= 1;
+                
+                // First undo strike rotation if it was an odd number of runs
+                if (last.runs % 2 !== 0) {
+                    setOnStrike(onStrike === 'batter1' ? 'batter2' : 'batter1');
+                }
+
+                // Then undo batter ball count based on the original strike
+                const originalStrike = last.runs % 2 !== 0 ? (onStrike === 'batter1' ? 'batter2' : 'batter1') : onStrike;
+                
+                if (originalStrike === 'batter1') {
+                    setBatterStats(prev => ({
+                        ...prev,
+                        batter1: { ...prev.batter1, balls: Math.max(0, prev.batter1.balls - 1) }
+                    }));
+                } else {
+                    setBatterStats(prev => ({
+                        ...prev,
+                        batter2: { ...prev.batter2, balls: Math.max(0, prev.batter2.balls - 1) }
+                    }));
+                }
+            }
+
+            // Undo bowler stats
+            setBowlerStats(prev => ({
+                ...prev,
+                [currentBowler]: {
+                    ...prev[currentBowler],
+                    runs: Math.max(0, prev[currentBowler].runs - last.runs),
+                    balls: last.type === 'legbye' ? Math.max(0, prev[currentBowler].balls - 1) : prev[currentBowler].balls
+                }
+            }));
         } else if (last.type === 'wicket') {
             newData[inningIndex].wickets -= 1;
             newData[inningIndex].balls -= 1;
+            
+            // Remove the last out batsman
+            setOutBatsmen(prev => prev.slice(0, -1));
+            
+            // Undo bowler stats
+            setBowlerStats(prev => ({
+                ...prev,
+                [currentBowler]: {
+                    ...prev[currentBowler],
+                    wickets: Math.max(0, prev[currentBowler].wickets - 1),
+                    balls: Math.max(0, prev[currentBowler].balls - 1)
+                }
+            }));
         }
 
         setInningsData(newData);
