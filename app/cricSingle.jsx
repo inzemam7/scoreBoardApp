@@ -26,7 +26,7 @@ const Cricsingle = () => {
   const [matchHistory, setMatchHistory] = useState([]);
   const [showOversModal, setShowOversModal] = useState(false);
 
-  const oversOptions = [2, 5, 10, 20, 50];
+  const oversOptions = [2, 5, 8, 10, 15, 20, 50];
 
   useEffect(() => {
     loadMatchHistory();
@@ -140,7 +140,7 @@ const Cricsingle = () => {
     try {
       await AsyncStorage.setItem('currentMatchData', JSON.stringify(matchData));
       router.push({
-        pathname: '/matchScreen',
+        pathname: '/singleMatchScreen',
         params: {
           teamA: team1,
           teamB: team2,
