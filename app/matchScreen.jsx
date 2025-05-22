@@ -66,6 +66,12 @@ const MatchScreen = () => {
     const batter2FieldRef = useRef(null);
     const bowlerFieldRef = useRef(null);
 
+    const [isSuperOver, setIsSuperOver] = useState(false);
+    const [superOverData, setSuperOverData] = useState({
+        team1: { score: 0, balls: 0 },
+        team2: { score: 0, balls: 0 }
+    });
+
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -211,9 +217,35 @@ const MatchScreen = () => {
     };
 
     const endMatch = (matchWinner) => {
+        const team1Score = inningsData[0].score;
+        const team2Score = inningsData[1].score;
+
+        // Check if match is tied
+        if (team1Score === team2Score) {
+            setIsSuperOver(true);
+            // In super over, the team that batted second in main match bats first
+            // So if currentInning is 2, battingTeam is the one that should bat first in super over
+            const superOverBattingTeam = currentInning === 2 ? battingTeam : bowlingTeam;
+            const superOverBowlingTeam = superOverBattingTeam === teamAName ? teamBName : teamAName;
+            
+            setBattingTeam(superOverBattingTeam);
+            setBowlingTeam(superOverBowlingTeam);
+            setCurrentInning(1);
+            setOversLimit(1); // Super over is 1 over
+            setInningsData([
+                { score: 0, wickets: 0, balls: 0, history: [] },
+                { score: 0, wickets: 0, balls: 0, history: [] }
+            ]);
+            setBatterStats({ batter1: { runs: 0, balls: 0 }, batter2: { runs: 0, balls: 0 } });
+            setBowlerStats({});
+            setOutBatsmen([]);
+            setShowPlayerSelection(true);
+            return;
+        }
+
         setIsMatchOver(true);
         setWinner(matchWinner);
-    
+
         const matchData = {
             teamA: teamAName,
             teamB: teamBName,
@@ -238,9 +270,11 @@ const MatchScreen = () => {
             tossWinner,
             tossDecision,
             target: target || null,
-            result: getMatchResult(matchWinner)
+            result: getMatchResult(matchWinner),
+            isSuperOver: isSuperOver,
+            superOverData: isSuperOver ? superOverData : null
         };
-    
+
         Alert.alert(
             '🏆 Match Over',
             getMatchSummary(matchData),
@@ -275,11 +309,19 @@ const MatchScreen = () => {
         if (matchWinner === 'Tie') return 'Match Tied';
         
         const winningInnings = currentInning === 1 ? 0 : 1;
-        const margin = currentInning === 2 
-            ? `${target - inningsData[1].score - 1} runs`
-            : `${10 - inningsData[0].wickets} wickets`;
-            
-        return `${matchWinner} won by ${margin}`;
+        const isChasingTeamWon = currentInning === 2 && matchWinner === battingTeam;
+        
+        if (isChasingTeamWon) {
+            // If chasing team won, show wickets remaining
+            const wicketsRemaining = 10 - inningsData[1].wickets;
+            return `${matchWinner} won by ${wicketsRemaining} wickets`;
+        } else {
+            // If defending team won, show runs margin
+            const margin = currentInning === 2 
+                ? `${target - inningsData[1].score - 1} runs`
+                : `${10 - inningsData[0].wickets} wickets`;
+            return `${matchWinner} won by ${margin}`;
+        }
     };
 
     const getMatchSummary = (matchData) => {
@@ -1102,6 +1144,7 @@ const MatchScreen = () => {
             <View style={styles.header}>
                 <Text style={styles.title}>
                     {isViewOnly ? '📜 Match Details' :
+                     isSuperOver ? '🎯 Super Over' :
                      matchNumber === '3' ? '🏆 Final' : 
                      matchNumber === '2' ? '🎯 Semi-Final' : 
                      '🏏 Match - ' + (matchNumber || 1)}
@@ -1138,9 +1181,13 @@ const MatchScreen = () => {
                 </>
             ) : (
                 <>
-                    <Text style={styles.tossResult}>
-                        {tossWinner} won the toss and chose to {tossDecision}
-                    </Text>
+                    {isSuperOver ? (
+                        <Text style={styles.superOverText}>Super Over in Progress</Text>
+                    ) : (
+                        <Text style={styles.tossResult}>
+                            {tossWinner} won the toss and chose to {tossDecision}
+                        </Text>
+                    )}
                     <Text style={styles.inningText}>
                         {currentInning === 1
                             ? `1st Inning - ${battingTeam} Batting`
@@ -1422,5 +1469,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 5,
+  },
+  superOverText: {
+    fontSize: 24,
+    color: 'gold',
+    textAlign: 'center',
+    marginBottom: 20,
+    fontWeight: 'bold'
   },
 });
