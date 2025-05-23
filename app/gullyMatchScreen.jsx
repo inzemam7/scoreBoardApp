@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Button, Alert, ScrollView, Mo
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const SingleMatchScreen = () => {
+const GullyMatchScreen = () => {
     const params = useLocalSearchParams();
     const { teamA, teamB, matchNumber, tossWinner: passedTossWinner, isViewOnly, matchData, isSingleMatch } = params;
     const router = useRouter();
@@ -16,15 +16,14 @@ const SingleMatchScreen = () => {
     const [bowlingTeam, setBowlingTeam] = useState(null);
     const [teamAName, setTeamAName] = useState(teamA);
     const [teamBName, setTeamBName] = useState(teamB);
-    const [returnPath] = useState('/cricSingle');
-    const [historyKey] = useState('singleMatchHistory');
+    const [returnPath] = useState('/cricGully');
+    const [historyKey] = useState('gullyMatchHistory');
     const [teamPlayers, setTeamPlayers] = useState({});
 
     // Add new state variables for players
     const [teamAPlayers, setTeamAPlayers] = useState([]);
     const [teamBPlayers, setTeamBPlayers] = useState([]);
     const [currentBatter1, setCurrentBatter1] = useState(null);
-    const [currentBatter2, setCurrentBatter2] = useState(null);
     const [currentBowler, setCurrentBowler] = useState(null);
     const [showPlayerSelection, setShowPlayerSelection] = useState(false);
 
@@ -46,16 +45,15 @@ const SingleMatchScreen = () => {
 
     // Add these new state variables at the top with other state declarations
     const [showBatter1Dropdown, setShowBatter1Dropdown] = useState(false);
-    const [showBatter2Dropdown, setShowBatter2Dropdown] = useState(false);
     const [showBowlerDropdown, setShowBowlerDropdown] = useState(false);
     const [showNewBatterPopup, setShowNewBatterPopup] = useState(false);
     const [showNewBowlerPopup, setShowNewBowlerPopup] = useState(false);
 
     const [outBatsmen, setOutBatsmen] = useState([]);
 
-    const [onStrike, setOnStrike] = useState('batter1'); // 'batter1' or 'batter2'
-
-    const [batterStats, setBatterStats] = useState({ batter1: { runs: 0, balls: 0 }, batter2: { runs: 0, balls: 0 } });
+    const [batterStats, setBatterStats] = useState({
+        batter1: { runs: 0, balls: 0 }
+    });
     const [bowlerStats, setBowlerStats] = useState({});
 
     // Add new state for dropdown position
@@ -63,7 +61,6 @@ const SingleMatchScreen = () => {
 
     // Add refs for the fields
     const batter1FieldRef = useRef(null);
-    const batter2FieldRef = useRef(null);
     const bowlerFieldRef = useRef(null);
 
     const [isSuperOver, setIsSuperOver] = useState(false);
@@ -139,15 +136,13 @@ const SingleMatchScreen = () => {
     };
 
     const handlePlayerSelection = () => {
-        if (!currentBatter1 || !currentBatter2 || !currentBowler) {
-            Alert.alert('Selection Required', 'Please select both batters and a bowler');
+        if (!currentBatter1 || !currentBowler) {
+            Alert.alert('Selection Required', 'Please select a batter and a bowler');
             return;
         }
 
         // Check if any player is selected more than once
-        if (currentBatter1 === currentBatter2 || 
-            currentBatter1 === currentBowler || 
-            currentBatter2 === currentBowler) {
+        if (currentBatter1 === currentBowler) {
             Alert.alert('Invalid Selection', 'A player cannot be selected more than once');
             return;
         }
@@ -172,7 +167,7 @@ const SingleMatchScreen = () => {
         setCurrentInning(2);
 
         // Reset batter stats for new batters
-        setBatterStats({ batter1: { runs: 0, balls: 0 }, batter2: { runs: 0, balls: 0 } });
+        setBatterStats({ batter1: { runs: 0, balls: 0 } });
 
         // Show player selection popups at the start of the second inning
         setShowPlayerSelection(true);
@@ -183,8 +178,27 @@ const SingleMatchScreen = () => {
             const historyJSON = await AsyncStorage.getItem(historyKey);
             const history = historyJSON ? JSON.parse(historyJSON) : [];
     
-            history.push(matchData);
+            // Format match data for history with null checks
+            const formattedMatchData = {
+                teamA: teamAName,
+                teamB: teamBName,
+                winner: matchData.winner,
+                teamAScore: inningsData[0]?.score || 0,
+                teamAWickets: inningsData[0]?.wickets || 0,
+                teamBScore: inningsData[1]?.score || 0,
+                teamBWickets: inningsData[1]?.wickets || 0,
+                battingStats: {
+                    batter1: batterStats?.batter1 || { runs: 0, balls: 0 },
+                },
+                bowlingStats: bowlerStats || {},
+                tossWinner: tossWinner || '',
+                tossDecision: tossDecision || '',
+                playedOn: new Date().toLocaleString(),
+                isSuperOver: isSuperOver || false,
+                superOverData: isSuperOver ? superOverData : null
+            };
     
+            history.push(formattedMatchData);
             await AsyncStorage.setItem(historyKey, JSON.stringify(history));
             console.log("✅ Match saved to history");
         } catch (error) {
@@ -193,82 +207,82 @@ const SingleMatchScreen = () => {
     };
 
     const endMatch = (matchWinner) => {
-        const team1Score = inningsData[0].score;
-        const team2Score = inningsData[1].score;
+        try {
+            const team1Score = inningsData[0]?.score || 0;
+            const team2Score = inningsData[1]?.score || 0;
 
-        // Check if match is tied
-        if (team1Score === team2Score) {
-            setIsSuperOver(true);
-            // In super over, the team that batted second in main match bats first
-            // So if currentInning is 2, battingTeam is the one that should bat first in super over
-            const superOverBattingTeam = currentInning === 2 ? battingTeam : bowlingTeam;
-            const superOverBowlingTeam = superOverBattingTeam === teamAName ? teamBName : teamAName;
-            
-            setBattingTeam(superOverBattingTeam);
-            setBowlingTeam(superOverBowlingTeam);
-            setCurrentInning(1);
-            setOversLimit(1); // Super over is 1 over
-            setInningsData([
-                { score: 0, wickets: 0, balls: 0, history: [] },
-                { score: 0, wickets: 0, balls: 0, history: [] }
-            ]);
-            setBatterStats({ batter1: { runs: 0, balls: 0 }, batter2: { runs: 0, balls: 0 } });
-            setBowlerStats({});
-            setOutBatsmen([]);
-            setShowPlayerSelection(true);
-            return;
-        }
+            // Check if match is tied
+            if (team1Score === team2Score) {
+                setIsSuperOver(true);
+                const superOverBattingTeam = currentInning === 2 ? battingTeam : bowlingTeam;
+                const superOverBowlingTeam = superOverBattingTeam === teamAName ? teamBName : teamAName;
+                
+                setBattingTeam(superOverBattingTeam);
+                setBowlingTeam(superOverBowlingTeam);
+                setCurrentInning(1);
+                setOversLimit(1);
+                setInningsData([
+                    { score: 0, wickets: 0, balls: 0, history: [] },
+                    { score: 0, wickets: 0, balls: 0, history: [] }
+                ]);
+                setBatterStats({
+                    batter1: { runs: 0, balls: 0 },
+                });
+                setBowlerStats({});
+                setOutBatsmen([]);
+                setShowPlayerSelection(true);
+                return;
+            }
 
-        setIsMatchOver(true);
-        setWinner(matchWinner);
+            setIsMatchOver(true);
+            setWinner(matchWinner || 'Tie');
 
-        const matchData = {
-            teamA: teamAName,
-            teamB: teamBName,
-            winner: matchWinner,
-            matchNumber: parseInt(matchNumber) || 1,
-            round: getRoundName(),
-            playedOn: new Date().toLocaleString(),
-            innings: [
-                {
-                    team: currentInning === 1 ? battingTeam : bowlingTeam,
-                    score: inningsData[0].score,
-                    wickets: inningsData[0].wickets,
-                    overs: (Math.floor(inningsData[0].balls / 6) + (inningsData[0].balls % 6) / 10).toFixed(1)
-                },
-                {
-                    team: currentInning === 2 ? battingTeam : bowlingTeam,
-                    score: inningsData[1].score,
-                    wickets: inningsData[1].wickets,
-                    overs: (Math.floor(inningsData[1].balls / 6) + (inningsData[1].balls % 6) / 10).toFixed(1)
-                }
-            ],
-            tossWinner,
-            tossDecision,
-            target: target || null,
-            result: getMatchResult(matchWinner),
-            isSuperOver: isSuperOver,
-            superOverData: isSuperOver ? superOverData : null
-        };
-
-        Alert.alert(
-            '🏆 Match Over',
-            getMatchSummary(matchData),
-            [
-                {
-                    text: 'No',
-                    style: 'cancel',
-                    onPress: () => router.push(returnPath),
-                },
-                {
-                    text: 'Yes',
-                    onPress: async () => {
-                        await saveMatchToHistory(matchData);
-                        router.push(returnPath);
+            const matchData = {
+                winner: matchWinner || 'Tie',
+                result: getMatchResult(matchWinner || 'Tie'),
+                innings: [
+                    {
+                        team: teamAName,
+                        score: team1Score,
+                        wickets: inningsData[0]?.wickets || 0,
+                        overs: Math.floor((inningsData[0]?.balls || 0) / 6) + '.' + ((inningsData[0]?.balls || 0) % 6)
                     },
-                },
-            ]
-        );
+                    {
+                        team: teamBName,
+                        score: team2Score,
+                        wickets: inningsData[1]?.wickets || 0,
+                        overs: Math.floor((inningsData[1]?.balls || 0) / 6) + '.' + ((inningsData[1]?.balls || 0) % 6)
+                    }
+                ]
+            };
+
+            Alert.alert(
+                '🏆 Match Over',
+                getMatchSummary(matchData),
+                [
+                    {
+                        text: 'No',
+                        style: 'cancel',
+                        onPress: () => router.push(returnPath),
+                    },
+                    {
+                        text: 'Yes',
+                        onPress: async () => {
+                            try {
+                                await saveMatchToHistory(matchData);
+                                router.push(returnPath);
+                            } catch (error) {
+                                console.error('Error saving match:', error);
+                                Alert.alert('Error', 'Failed to save match. Please try again.');
+                            }
+                        },
+                    },
+                ]
+            );
+        } catch (error) {
+            console.error('Error in endMatch:', error);
+            Alert.alert('Error', 'An error occurred while ending the match. Please try again.');
+        }
     };
 
     const getRoundName = () => {
@@ -282,35 +296,48 @@ const SingleMatchScreen = () => {
     };
 
     const getMatchResult = (matchWinner) => {
-        if (matchWinner === 'Tie') return 'Match Tied';
-        
-        const winningInnings = currentInning === 1 ? 0 : 1;
-        const isChasingTeamWon = currentInning === 2 && matchWinner === battingTeam;
-        
-        if (isChasingTeamWon) {
-            // If chasing team won, show wickets remaining
-            const wicketsRemaining = 10 - inningsData[1].wickets;
-            return `${matchWinner} won by ${wicketsRemaining} wickets`;
-        } else {
-            // If defending team won, show runs margin
-            const margin = currentInning === 2 
-                ? `${target - inningsData[1].score - 1} runs`
-                : `${10 - inningsData[0].wickets} wickets`;
-            return `${matchWinner} won by ${margin}`;
+        try {
+            if (!matchWinner || matchWinner === 'Tie') return 'Match Tied';
+            
+            const winningInnings = currentInning === 1 ? 0 : 1;
+            const isChasingTeamWon = currentInning === 2 && matchWinner === battingTeam;
+            
+            if (isChasingTeamWon) {
+                const wicketsRemaining = 10 - (inningsData[1]?.wickets || 0);
+                return `${matchWinner} won by ${wicketsRemaining} wickets`;
+            } else {
+                const margin = currentInning === 2 
+                    ? `${(target || 0) - (inningsData[1]?.score || 0) - 1} runs`
+                    : `${10 - (inningsData[0]?.wickets || 0)} wickets`;
+                return `${matchWinner} won by ${margin}`;
+            }
+        } catch (error) {
+            console.error('Error in getMatchResult:', error);
+            return 'Match Result Error';
         }
     };
 
     const getMatchSummary = (matchData) => {
-        let summary = matchData.winner === 'Tie' 
-            ? "It's a tie!\n\n" 
-            : `${matchData.winner} wins!\n\n`;
+        try {
+            if (!matchData) return 'Match Summary Error';
 
-        summary += `${matchData.innings[0].team}: ${matchData.innings[0].score}/${matchData.innings[0].wickets} (${matchData.innings[0].overs})\n`;
-        summary += `${matchData.innings[1].team}: ${matchData.innings[1].score}/${matchData.innings[1].wickets} (${matchData.innings[1].overs})\n\n`;
-        summary += matchData.result;
-        summary += '\n\nDo you want to save this match to history?';
+            let summary = matchData.winner === 'Tie' 
+                ? "It's a tie!\n\n" 
+                : `${matchData.winner} wins!\n\n`;
 
-        return summary;
+            if (matchData.innings && matchData.innings.length >= 2) {
+                summary += `${matchData.innings[0].team}: ${matchData.innings[0].score}/${matchData.innings[0].wickets} (${matchData.innings[0].overs})\n`;
+                summary += `${matchData.innings[1].team}: ${matchData.innings[1].score}/${matchData.innings[1].wickets} (${matchData.innings[1].overs})\n\n`;
+            }
+            
+            summary += matchData.result || 'No result available';
+            summary += '\n\nDo you want to save this match to history?';
+
+            return summary;
+        } catch (error) {
+            console.error('Error in getMatchSummary:', error);
+            return 'Error generating match summary';
+        }
     };
 
     const updateBall = (runs, extra = false, isWicket = false, extraType = null) => {
@@ -322,7 +349,7 @@ const SingleMatchScreen = () => {
 
         // Get the number of players in the batting team
         const battingTeamPlayers = battingTeam === teamAName ? teamAPlayers : teamBPlayers;
-        const maxWickets = battingTeamPlayers.length - 1; // All out when n-1 wickets fall
+        const maxWickets = battingTeamPlayers.length; // All out when all players are out
 
         if (isWicket) {
             // Check if this wicket would make the team all out
@@ -386,27 +413,13 @@ const SingleMatchScreen = () => {
             if (extraType === 'legbye') {
                 newData[inningIndex].balls += 1;
                 // Add ball to batsman's stats but not runs
-                if (onStrike === 'batter1') {
-                    setBatterStats(prev => ({
-                        ...prev,
-                        batter1: { ...prev.batter1, balls: prev.batter1.balls + 1 }
-                    }));
-                } else {
-                    setBatterStats(prev => ({
-                        ...prev,
-                        batter2: { ...prev.batter2, balls: prev.batter2.balls + 1 }
-                    }));
-                }
-                // Change strike if odd number of runs
-                if (runs % 2 !== 0) {
-                    setOnStrike(onStrike === 'batter1' ? 'batter2' : 'batter1');
-                }
+                setBatterStats(prev => ({
+                    ...prev,
+                    batter1: { ...prev.batter1, balls: prev.batter1.balls + 1 }
+                }));
             } else if (extraType === 'wide' || extraType === 'noball') {
                 // For wides and no balls, consider only the additional runs (not the extra run) for strike rotation
                 const additionalRuns = runs - 1; // Subtract 1 to get only the additional runs
-                if (additionalRuns % 2 !== 0) {
-                    setOnStrike(onStrike === 'batter1' ? 'batter2' : 'batter1');
-                }
             }
             
             setBowlerStats(prev => ({
@@ -423,18 +436,11 @@ const SingleMatchScreen = () => {
             historyEntry.runs = runs;
             newData[inningIndex].balls += 1;
 
-            // Update batter stats
-            if (onStrike === 'batter1') {
-                setBatterStats(prev => ({
-                    ...prev,
-                    batter1: { runs: prev.batter1.runs + runs, balls: prev.batter1.balls + 1 }
-                }));
-            } else {
-                setBatterStats(prev => ({
-                    ...prev,
-                    batter2: { runs: prev.batter2.runs + runs, balls: prev.batter2.balls + 1 }
-                }));
-            }
+            // Update batter stats for all runs scored
+            setBatterStats(prev => ({
+                ...prev,
+                batter1: { runs: prev.batter1.runs + runs, balls: prev.batter1.balls + 1 }
+            }));
 
             // Update bowler stats
             setBowlerStats(prev => ({
@@ -445,11 +451,6 @@ const SingleMatchScreen = () => {
                     balls: (prev[currentBowler]?.balls || 0) + 1
                 }
             }));
-
-            // Rotate strike if odd number of runs
-            if (runs % 2 !== 0) {
-                setOnStrike(onStrike === 'batter1' ? 'batter2' : 'batter1');
-            }
         }
 
         newData[inningIndex].history.push(historyEntry);
@@ -498,7 +499,6 @@ const SingleMatchScreen = () => {
         ).length;
         
         if (legalBalls > 0 && legalBalls % 6 === 0) {
-            setOnStrike(onStrike === 'batter1' ? 'batter2' : 'batter1');
             setShowNewBowlerPopup(true);
         }
 
@@ -523,13 +523,8 @@ const SingleMatchScreen = () => {
             newData[inningIndex].score -= last.runs;
             newData[inningIndex].balls -= 1;
             
-            // First undo strike rotation if it was an odd number of runs
-            if (last.runs % 2 !== 0) {
-                setOnStrike(onStrike === 'batter1' ? 'batter2' : 'batter1');
-            }
-
             // Then undo batter stats based on the original strike
-            const originalStrike = last.runs % 2 !== 0 ? (onStrike === 'batter1' ? 'batter2' : 'batter1') : onStrike;
+            const originalStrike = last.runs % 2 !== 0 ? 'batter2' : 'batter1';
             
             if (originalStrike === 'batter1') {
                 setBatterStats(prev => ({
@@ -537,14 +532,6 @@ const SingleMatchScreen = () => {
                     batter1: { 
                         runs: Math.max(0, prev.batter1.runs - last.runs), 
                         balls: Math.max(0, prev.batter1.balls - 1) 
-                    }
-                }));
-            } else {
-                setBatterStats(prev => ({
-                    ...prev,
-                    batter2: { 
-                        runs: Math.max(0, prev.batter2.runs - last.runs), 
-                        balls: Math.max(0, prev.batter2.balls - 1) 
                     }
                 }));
             }
@@ -564,23 +551,13 @@ const SingleMatchScreen = () => {
             if (last.type === 'legbye') {
                 newData[inningIndex].balls -= 1;
                 
-                // First undo strike rotation if it was an odd number of runs
-                if (last.runs % 2 !== 0) {
-                    setOnStrike(onStrike === 'batter1' ? 'batter2' : 'batter1');
-                }
-
                 // Then undo batter ball count based on the original strike
-                const originalStrike = last.runs % 2 !== 0 ? (onStrike === 'batter1' ? 'batter2' : 'batter1') : onStrike;
+                const originalStrike = last.runs % 2 !== 0 ? 'batter2' : 'batter1';
                 
                 if (originalStrike === 'batter1') {
                     setBatterStats(prev => ({
                         ...prev,
                         batter1: { ...prev.batter1, balls: Math.max(0, prev.batter1.balls - 1) }
-                    }));
-                } else {
-                    setBatterStats(prev => ({
-                        ...prev,
-                        batter2: { ...prev.batter2, balls: Math.max(0, prev.batter2.balls - 1) }
                     }));
                 }
             }
@@ -717,61 +694,6 @@ const SingleMatchScreen = () => {
                                 )}
                             </View>
                         </View>
-                        
-                        <View style={styles.playerColumn}>
-                            <Text style={styles.playerLabel}>Batter 2:</Text>
-                            <View style={styles.dropdownWrapper}>
-                                <TouchableOpacity 
-                                    ref={batter2FieldRef}
-                                    style={styles.dropdownField}
-                                    onPress={(event) => handleDropdownPress(event, batter2FieldRef, setShowBatter2Dropdown, showBatter2Dropdown)}
-                                >
-                                    <Text style={styles.dropdownButtonText}>
-                                        {currentBatter2 || 'Select Batter 2'}
-                                    </Text>
-                                </TouchableOpacity>
-                                {showBatter2Dropdown && (
-                                    <Modal
-                                        transparent={true}
-                                        visible={showBatter2Dropdown}
-                                        onRequestClose={() => setShowBatter2Dropdown(false)}
-                                    >
-                                        <TouchableOpacity 
-                                            style={styles.modalOverlay}
-                                            activeOpacity={1}
-                                            onPress={() => setShowBatter2Dropdown(false)}
-                                        >
-                                            <View style={[styles.dropdownList, { 
-                                                position: 'absolute',
-                                                top: dropdownPosition.y,
-                                                left: dropdownPosition.x,
-                                                width: dropdownPosition.width,
-                                            }]}>
-                                                <ScrollView 
-                                                    style={styles.dropdownScrollView}
-                                                    showsVerticalScrollIndicator={true}
-                                                    nestedScrollEnabled={true}
-                                                    scrollEnabled={true}
-                                                >
-                                            {battingTeamPlayers.map((player, index) => (
-                                                <TouchableOpacity
-                                                    key={`batter2-${index}`}
-                                                    style={styles.dropdownItem}
-                                                    onPress={() => {
-                                                        setCurrentBatter2(player);
-                                                        setShowBatter2Dropdown(false);
-                                                    }}
-                                                >
-                                                    <Text style={styles.dropdownItemText}>{player}</Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </ScrollView>
-                                    </View>
-                                        </TouchableOpacity>
-                                    </Modal>
-                                )}
-                            </View>
-                        </View>
                     </View>
 
                     <Text style={styles.sectionTitle}>Select Bowler:</Text>
@@ -844,7 +766,7 @@ const SingleMatchScreen = () => {
 
     const renderNewBatterPopup = () => {
         const battingTeamPlayers = battingTeam === teamAName ? teamAPlayers : teamBPlayers;
-        const availablePlayers = battingTeamPlayers.filter(player => !outBatsmen.includes(player) && player !== currentBatter1 && player !== currentBatter2);
+        const availablePlayers = battingTeamPlayers.filter(player => !outBatsmen.includes(player) && player !== currentBatter1);
         return (
             <View style={styles.modalContainer}>
                 <View style={styles.modalContent}>
@@ -1171,12 +1093,22 @@ const SingleMatchScreen = () => {
         );
     };
 
+    const viewMatchDetails = (match) => {
+        router.push({
+            pathname: '/gullyMatchHistory',
+            params: {
+                matchData: JSON.stringify(match),
+                isSingleMatch: true
+            },
+        });
+    };
+
     return (
         <ScrollView style={styles.container}>
             <View style={styles.header}>
                 <Text style={styles.title}>
                     {isViewOnly ? '📜 Match Details' : 
-                     isSuperOver ? '🎯 Super Over' : '🏏 Single Match'}
+                     isSuperOver ? '🎯 Super Over' : '🏏 Gully Match'}
                 </Text>
                 <Text style={styles.teams}>
                     {teamAName} vs {teamBName}
@@ -1239,15 +1171,12 @@ const SingleMatchScreen = () => {
                         <View style={styles.playerInfoContainer}>
                             <View style={styles.battersContainer}>
                                 <Text style={styles.playerInfo}>
-                                     {currentBatter1} {onStrike === 'batter1' ? '•' : ''} - {batterStats.batter1.runs}({batterStats.batter1.balls})
-                                </Text>
-                                <Text style={styles.playerInfo}>
-                                     {currentBatter2} {onStrike === 'batter2' ? '•' : ''} - {batterStats.batter2.runs}({batterStats.batter2.balls})
+                                    {currentBatter1 || 'Not Selected'} - {batterStats?.batter1?.runs || 0}({batterStats?.batter1?.balls || 0})
                                 </Text>
                             </View>
                             <View style={styles.bowlerContainer}>
                                 <Text style={styles.playerInfo}>
-                                     {currentBowler} - {bowlerStats[currentBowler]?.wickets || 0}/{bowlerStats[currentBowler]?.runs || 0} ({Math.floor((bowlerStats[currentBowler]?.balls || 0) / 6)}.{(bowlerStats[currentBowler]?.balls || 0) % 6})
+                                    {currentBowler || 'Not Selected'} - {bowlerStats[currentBowler]?.wickets || 0}/{bowlerStats[currentBowler]?.runs || 0} ({Math.floor((bowlerStats[currentBowler]?.balls || 0) / 6)}.{(bowlerStats[currentBowler]?.balls || 0) % 6})
                                 </Text>
                             </View>
                         </View>
@@ -1277,7 +1206,7 @@ const SingleMatchScreen = () => {
     );
 };
 
-export default SingleMatchScreen;
+export default GullyMatchScreen;
 
 
 const styles = StyleSheet.create({

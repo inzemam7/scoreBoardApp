@@ -1210,15 +1210,15 @@ const MatchScreen = () => {
                         <View style={styles.playerInfoContainer}>
                             <View style={styles.battersContainer}>
                                 <Text style={styles.playerInfo}>
-                                    Batter1: {currentBatter1} {onStrike === 'batter1' ? '•' : ''} - {batterStats.batter1.runs}({batterStats.batter1.balls})
+                                     {currentBatter1} {onStrike === 'batter1' ? '•' : ''} - {batterStats.batter1.runs}({batterStats.batter1.balls})
                                 </Text>
                                 <Text style={styles.playerInfo}>
-                                    Batter2: {currentBatter2} {onStrike === 'batter2' ? '•' : ''} - {batterStats.batter2.runs}({batterStats.batter2.balls})
+                                    {currentBatter2} {onStrike === 'batter2' ? '•' : ''} - {batterStats.batter2.runs}({batterStats.batter2.balls})
                                 </Text>
                             </View>
                             <View style={styles.bowlerContainer}>
                                 <Text style={styles.playerInfo}>
-                                    Bowler: {currentBowler} - {bowlerStats[currentBowler]?.wickets || 0}/{bowlerStats[currentBowler]?.runs || 0} ({Math.floor((bowlerStats[currentBowler]?.balls || 0) / 6)}.{(bowlerStats[currentBowler]?.balls || 0) % 6})
+                                     {currentBowler} - {bowlerStats[currentBowler]?.wickets || 0}/{bowlerStats[currentBowler]?.runs || 0} ({Math.floor((bowlerStats[currentBowler]?.balls || 0) / 6)}.{(bowlerStats[currentBowler]?.balls || 0) % 6})
                                 </Text>
                             </View>
                         </View>

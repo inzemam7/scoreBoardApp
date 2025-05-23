@@ -7,13 +7,19 @@ export default function Cricket() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Cricket Scoring</Text>
+        <Text style={styles.title}>Cricket</Text>
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
             style={styles.button}
             onPress={() => router.push('/cricSingle')}
           >
             <Text style={styles.buttonText}>One-off Match</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.button}
+            onPress={() => router.push('/cricGully')}
+          >
+            <Text style={styles.buttonText}>Gully</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.button}
@@ -30,7 +36,7 @@ export default function Cricket() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'lightyellow',
+    backgroundColor: '#222',
   },
   content: {
     flex: 1,
