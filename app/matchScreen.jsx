@@ -72,6 +72,9 @@ const MatchScreen = () => {
         team2: { score: 0, balls: 0 }
     });
 
+    // Add new state for run out popup
+    const [showRunOutOptions, setShowRunOutOptions] = useState(false);
+
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -1139,6 +1142,61 @@ const MatchScreen = () => {
         );
     };
 
+    const renderRunOutPopup = () => {
+        const runOutOptions = [
+            { label: 'Strike', runs: 0 },
+            { label: 'Strike + 1', runs: 1 },
+            { label: 'Strike + 2', runs: 2 },
+            { label: 'Strike + 3', runs: 3 },
+            { label: 'Non Strike', runs: 0 },
+            { label: 'Non Strike + 1', runs: 1 },
+            { label: 'Non Strike + 2', runs: 2 },
+            { label: 'Non Strike + 3', runs: 3 }
+        ];
+
+        return (
+            <Modal
+                transparent={true}
+                visible={showRunOutOptions}
+                onRequestClose={() => setShowRunOutOptions(false)}
+            >
+                <TouchableOpacity 
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => setShowRunOutOptions(false)}
+                >
+                    <View style={[styles.dropdownList, { 
+                        position: 'absolute',
+                        top: '50%',
+                        left: '25%',
+                        width: '50%',
+                        maxHeight: 300,
+                    }]}>
+                        <ScrollView 
+                            style={styles.dropdownScrollView}
+                            showsVerticalScrollIndicator={true}
+                            nestedScrollEnabled={true}
+                            scrollEnabled={true}
+                        >
+                            {runOutOptions.map((option) => (
+                                <TouchableOpacity
+                                    key={option.label}
+                                    style={styles.dropdownItem}
+                                    onPress={() => {
+                                        updateBall(option.runs, false, true, 'runout');
+                                        setShowRunOutOptions(false);
+                                    }}
+                                >
+                                    <Text style={styles.dropdownItemText}>{option.label}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
+        );
+    };
+
     return (
         <ScrollView style={styles.container}>
             <View style={styles.header}>
@@ -1210,15 +1268,15 @@ const MatchScreen = () => {
                         <View style={styles.playerInfoContainer}>
                             <View style={styles.battersContainer}>
                                 <Text style={styles.playerInfo}>
-                                     {currentBatter1} {onStrike === 'batter1' ? '•' : ''} - {batterStats.batter1.runs}({batterStats.batter1.balls})
+                                    Batter1: {currentBatter1} {onStrike === 'batter1' ? '•' : ''} - {batterStats.batter1.runs}({batterStats.batter1.balls})
                                 </Text>
                                 <Text style={styles.playerInfo}>
-                                    {currentBatter2} {onStrike === 'batter2' ? '•' : ''} - {batterStats.batter2.runs}({batterStats.batter2.balls})
+                                    Batter2: {currentBatter2} {onStrike === 'batter2' ? '•' : ''} - {batterStats.batter2.runs}({batterStats.batter2.balls})
                                 </Text>
                             </View>
                             <View style={styles.bowlerContainer}>
                                 <Text style={styles.playerInfo}>
-                                     {currentBowler} - {bowlerStats[currentBowler]?.wickets || 0}/{bowlerStats[currentBowler]?.runs || 0} ({Math.floor((bowlerStats[currentBowler]?.balls || 0) / 6)}.{(bowlerStats[currentBowler]?.balls || 0) % 6})
+                                    Bowler: {currentBowler} - {bowlerStats[currentBowler]?.wickets || 0}/{bowlerStats[currentBowler]?.runs || 0} ({Math.floor((bowlerStats[currentBowler]?.balls || 0) / 6)}.{(bowlerStats[currentBowler]?.balls || 0) % 6})
                                 </Text>
                             </View>
                         </View>
@@ -1234,6 +1292,7 @@ const MatchScreen = () => {
                         <Button title="5" onPress={() => updateBall(5)} />
                         <Button title="6" onPress={() => updateBall(6)} />
                         <Button title="Wicket" color="red" onPress={() => updateBall(0, false, true)} />
+                        <Button title="Run Out" color="orange" onPress={() => setShowRunOutOptions(true)} />
                         <Button title="Undo" color="#ffcc00" onPress={undoLastBall} />
                     </View>
 
@@ -1244,6 +1303,7 @@ const MatchScreen = () => {
             {showPlayerSelection && renderPlayerSelection()}
             {showNewBatterPopup && renderNewBatterPopup()}
             {showNewBowlerPopup && renderNewBowlerPopup()}
+            {showRunOutOptions && renderRunOutPopup()}
         </ScrollView>
     );
 };
