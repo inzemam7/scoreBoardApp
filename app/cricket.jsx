@@ -36,7 +36,7 @@ export default function Cricket() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#222',
+    backgroundColor: 'lightyellow',
   },
   content: {
     flex: 1,
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   title: {
-    fontSize: 40,
+    fontSize: 50,
     fontWeight: 'bold',
     color: 'gold',
     marginBottom: 40,

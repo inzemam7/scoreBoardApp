@@ -28,8 +28,8 @@ const MatchCard = React.memo(({ match, onPress, statusColor }) => (
       styles.matchCard,
       match.status === 'completed' && styles.completedCard
     ]}
-    onPress={() => onPress(match)}
-    activeOpacity={0.7}
+    onPress={() => match.status !== 'completed' && onPress(match)}
+    activeOpacity={match.status === 'completed' ? 1 : 0.7}
   >
     <View style={styles.matchHeader}>
       <Text style={styles.matchStatus}>({match.status.replace('_', ' ')})</Text>
@@ -226,7 +226,10 @@ const FootballFixtures = () => {
   };
 
   const handleMatchPress = async (match) => {
-    if (match.status === 'completed') return;
+    // Double check to prevent completed matches from being started
+    if (match.status === 'completed') {
+      return;
+    }
     
     try {
       const updatedFixtures = fixtures.map(f => {
@@ -498,7 +501,8 @@ const styles = StyleSheet.create({
   },
   completedCard: {
     backgroundColor: '#F5F5F5',
-    borderColor: '#4CAF50'
+    borderColor: '#4CAF50',
+    opacity: 0.8  // Add slight opacity to indicate it's not interactive
   },
   matchHeader: {
     flexDirection: 'row',

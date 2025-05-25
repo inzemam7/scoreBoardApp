@@ -42,6 +42,7 @@ const FootballMatchscreen = () => {
 
   const [showSaveMatchModal, setShowSaveMatchModal] = useState(false);
   const [matchResult, setMatchResult] = useState(null);
+  const [hasShownSaveModal, setHasShownSaveModal] = useState(false);
 
   // Load team players data
   useEffect(() => {
@@ -193,12 +194,17 @@ const FootballMatchscreen = () => {
       // Check for winner in sudden death (after round 5)
       if (penaltyRound >= 5) {
         const teamATotal = penaltyTeamAScore;
-        const teamBTotal = penaltyTeamBScore + (team === 'B' ? 0 : 1);
+        const teamBTotal = penaltyTeamBScore;
         
-        if (teamATotal !== teamBTotal) {
+        // If one team has missed and the other has scored in the same round
+        if (team === 'A' && teamBTotal > teamATotal) {
           setIsPenaltyShootout(false);
           setShowPenaltyModal(false);
-          handleMatchEnd(); // Call handleMatchEnd when penalty shootout is complete
+          handleMatchEnd();
+        } else if (team === 'B' && teamATotal > teamBTotal) {
+          setIsPenaltyShootout(false);
+          setShowPenaltyModal(false);
+          handleMatchEnd();
         }
       }
     }
@@ -321,7 +327,15 @@ const FootballMatchscreen = () => {
   };
 
   const handleMatchEnd = () => {
-    if (showSaveMatchModal) return; // Prevent multiple calls
+    if (showSaveMatchModal || hasShownSaveModal) return; // Prevent multiple calls
+    
+    // Determine the winner based on penalty shootout if it occurred
+    let winner;
+    if (isPenaltyShootout) {
+      winner = penaltyTeamAScore > penaltyTeamBScore ? parsedMatch.teamA.teamName : parsedMatch.teamB.teamName;
+    } else {
+      winner = teamAScore > teamBScore ? parsedMatch.teamA.teamName : parsedMatch.teamB.teamName;
+    }
     
     const result = {
       teamA: parsedMatch.teamA.teamName,
@@ -330,7 +344,8 @@ const FootballMatchscreen = () => {
         teamA: teamAScore,
         teamB: teamBScore
       },
-      winner: getWinnerText(),
+      winner: winner,
+      winnerText: getWinnerText(),
       goalHistory: goalHistory,
       penaltyShootout: isPenaltyShootout ? {
         teamAScore: penaltyTeamAScore,
@@ -343,10 +358,13 @@ const FootballMatchscreen = () => {
     };
     setMatchResult(result);
     setShowSaveMatchModal(true);
+    setHasShownSaveModal(true);
   };
 
   const saveMatchResult = async () => {
     try {
+      if (!matchResult) return; // Prevent saving if no result
+
       // Save match result to AsyncStorage
       const existingHistory = await AsyncStorage.getItem('footballMatchHistory');
       const history = existingHistory ? JSON.parse(existingHistory) : [];
@@ -364,7 +382,8 @@ const FootballMatchscreen = () => {
                 ...fixture,
                 status: 'completed',
                 score: matchResult.score,
-                winner: matchResult.winner
+                winner: matchResult.winner,
+                winnerText: matchResult.winnerText
               };
             }
             return fixture;
@@ -373,12 +392,25 @@ const FootballMatchscreen = () => {
         }
       }
       
+      // Reset states before navigation
+      setShowSaveMatchModal(false);
+      setHasShownSaveModal(false);
+      setMatchResult(null);
+      
       // Navigate back to fixtures
       router.push('/footballFixtures');
     } catch (error) {
       console.error('Error saving match result:', error);
       Alert.alert('Error', 'Failed to save match result');
     }
+  };
+
+  // Add handler for when user chooses not to save
+  const handleDontSave = () => {
+    setShowSaveMatchModal(false);
+    setHasShownSaveModal(false);
+    setMatchResult(null);
+    router.push('/footballFixtures');
   };
 
   return (
@@ -581,7 +613,7 @@ const FootballMatchscreen = () => {
             <View style={styles.drawOptionsContainer}>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.drawButton]} 
-                onPress={() => router.push('/footballFixtures')}
+                onPress={handleDontSave}
               >
                 <Text style={styles.buttonText}>Don't Save</Text>
               </TouchableOpacity>

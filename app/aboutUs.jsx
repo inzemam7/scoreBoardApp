@@ -5,11 +5,11 @@ const AboutUs = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>About Us</Text>
-      <Text style={styles.Text}>Syed Inzemamuddin : 22361A05B4</Text>
-      <Text style={styles.Text}>Nawaz Mohd Khan: 22361A0577</Text>
-      <Text style={styles.Text}>Nikitha : 22361A0580</Text>
-      <Text style={styles.Text}>Sharnika : 22361A0591</Text>
-      <Text style={styles.Text}>Syed Mubassir : 22361A05B5</Text>
+      <Text style={styles.Text}>Syed Inzemamuddin  22361A05B4</Text>
+      <Text style={styles.Text}>Nawaz Mohd Khan  22361A0577</Text>
+      <Text style={styles.Text}>V Nikitha   22361A0580</Text>
+      <Text style={styles.Text}>K Sharnika  22361A0591</Text>
+      <Text style={styles.Text}>Syed Mubassir  22361A05B5</Text>
 
     </View>
   );
@@ -32,12 +32,14 @@ const styles = StyleSheet.create({
     margin:30
   },
   Text: {
-    fontSize: 20,
+    fontSize: 30,
     fontWeight:'700',
-    backgroundColor:'papayawhip',
+    color:'gold',
+    backgroundColor:'#333',
     textAlign:'center',
-    margin:10,
+    margin:15,
     padding:10,
-    borderRadius:20
+    borderRadius:20,
+    width:'90%'
   }
 });

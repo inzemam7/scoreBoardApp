@@ -10,7 +10,7 @@ const FootballTeamSetup = () => {
   const [expandedTeams, setExpandedTeams] = useState({});
   const router = useRouter();
 
-  const playersPerTeam = 1; // 11 players 
+  const playersPerTeam = 11; // 11 players 
 
   useEffect(() => {
     async function fetchData() {
