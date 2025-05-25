@@ -1174,61 +1174,6 @@ const SingleMatchScreen = () => {
         );
     };
 
-    const renderRunOutPopup = () => {
-        const runOutOptions = [
-            { label: 'Strike', runs: 0 },
-            { label: 'Strike + 1', runs: 1 },
-            { label: 'Strike + 2', runs: 2 },
-            { label: 'Strike + 3', runs: 3 },
-            { label: 'Non Strike', runs: 0 },
-            { label: 'Non Strike + 1', runs: 1 },
-            { label: 'Non Strike + 2', runs: 2 },
-            { label: 'Non Strike + 3', runs: 3 }
-        ];
-
-        return (
-            <Modal
-                transparent={true}
-                visible={showRunOutOptions}
-                onRequestClose={() => setShowRunOutOptions(false)}
-            >
-                <TouchableOpacity 
-                    style={styles.modalOverlay}
-                    activeOpacity={1}
-                    onPress={() => setShowRunOutOptions(false)}
-                >
-                    <View style={[styles.dropdownList, { 
-                        position: 'absolute',
-                        top: '50%',
-                        left: '25%',
-                        width: '50%',
-                        maxHeight: 300,
-                    }]}>
-                        <ScrollView 
-                            style={styles.dropdownScrollView}
-                            showsVerticalScrollIndicator={true}
-                            nestedScrollEnabled={true}
-                            scrollEnabled={true}
-                        >
-                            {runOutOptions.map((option) => (
-                                <TouchableOpacity
-                                    key={option.label}
-                                    style={styles.dropdownItem}
-                                    onPress={() => {
-                                        updateBall(option.runs, false, true, 'runout');
-                                        setShowRunOutOptions(false);
-                                    }}
-                                >
-                                    <Text style={styles.dropdownItemText}>{option.label}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-                    </View>
-                </TouchableOpacity>
-            </Modal>
-        );
-    };
-
     return (
         <ScrollView style={styles.container}>
             <View style={styles.header}>
@@ -1302,6 +1247,12 @@ const SingleMatchScreen = () => {
                                 <Text style={styles.playerInfo}>
                                      {currentBatter2} {onStrike === 'batter2' ? '•' : ''} - {batterStats.batter2.runs}({batterStats.batter2.balls})
                                 </Text>
+                                <TouchableOpacity 
+                                    style={styles.rotateStrikeButton}
+                                    onPress={() => setOnStrike(onStrike === 'batter1' ? 'batter2' : 'batter1')}
+                                >
+                                    <Text style={styles.rotateStrikeText}>🔄 Rotate Strike</Text>
+                                </TouchableOpacity>
                             </View>
                             <View style={styles.bowlerContainer}>
                                 <Text style={styles.playerInfo}>
@@ -1321,7 +1272,6 @@ const SingleMatchScreen = () => {
                         <Button title="5" onPress={() => updateBall(5)} />
                         <Button title="6" onPress={() => updateBall(6)} />
                         <Button title="Wicket" color="red" onPress={() => updateBall(0, false, true)} />
-                        <Button title="Run Out" color="orange" onPress={() => setShowRunOutOptions(true)} />
                         <Button title="Undo" color="#ffcc00" onPress={undoLastBall} />
                     </View>
 
@@ -1332,7 +1282,6 @@ const SingleMatchScreen = () => {
             {showPlayerSelection && renderPlayerSelection()}
             {showNewBatterPopup && renderNewBatterPopup()}
             {showNewBowlerPopup && renderNewBowlerPopup()}
-            {showRunOutOptions && renderRunOutPopup()}
         </ScrollView>
     );
 };
@@ -1565,5 +1514,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
     fontWeight: 'bold'
+  },
+  rotateStrikeButton: {
+    backgroundColor: '#444',
+    padding: 8,
+    borderRadius: 5,
+    marginTop: 5,
+    alignItems: 'center',
+  },
+  rotateStrikeText: {
+    color: 'white',
+    fontSize: 14,
   },
 });

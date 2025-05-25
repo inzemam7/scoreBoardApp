@@ -189,35 +189,61 @@ const Fixtures = () => {
         return;
       }
 
-      // Handle finals (last round)
-      if (round === totalRounds) {
-        try {
-          console.log('Processing final match');
-          
-          // Get the final match from completed matches
-          const finalMatch = completedMatches[completedMatches.length - 1];
-          if (!finalMatch) {
-            throw new Error('Final match result not found');
-          }
+      // Get winners from current round matches
+      const currentRoundMatches = completedMatches.filter(match => 
+        !match.teamA.includes('BYE') && !match.teamB.includes('BYE')
+      ).slice(-currentNonByeMatches.length);
+      
+      console.log('Current round matches:', currentRoundMatches);
 
-          console.log('Final match:', finalMatch);
-          const winner = finalMatch.winner;
-          
+      // Get winners from matches
+      const roundWinners = currentRoundMatches.map(match => {
+        const winnerTeamEntry = Object.entries(teamNames).find(([_, name]) => name === match.winner);
+        if (!winnerTeamEntry) {
+          throw new Error(`Could not find team key for winner: ${match.winner}`);
+        }
+        return winnerTeamEntry[0];
+      });
+
+      // Add bye team winners if any
+      const byeMatches = fixtures.filter(([_, teamB]) => teamB === 'BYE');
+      const byeWinners = byeMatches.map(([teamA]) => teamA);
+      const allWinners = [...roundWinners, ...byeWinners];
+
+      console.log('Round winners:', allWinners);
+
+      // If we have exactly two teams left, this is the final match
+      if (allWinners.length === 2) {
+        const finalMatch = [allWinners[0], allWinners[1]];
+        await AsyncStorage.setItem('tournamentFixtures', JSON.stringify([finalMatch]));
+        setFixtures([finalMatch]);
+        setCurrentTeams(allWinners);
+        setRound(round + 1);
+        
+        Alert.alert(
+          'Final Match',
+          `The final match is set:\n${teamNames[finalMatch[0]]} vs ${teamNames[finalMatch[1]]}`,
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Check if the final match has been completed
+      if (round === totalRounds) {
+        const finalMatch = completedMatches[completedMatches.length - 1];
+        if (finalMatch && finalMatch.winner) {
           // Store tournament winner and mark tournament as complete
-          await AsyncStorage.setItem('tournamentWinner', winner);
+          await AsyncStorage.setItem('tournamentWinner', finalMatch.winner);
           await AsyncStorage.setItem('tournamentComplete', 'true');
-          setTournamentWinner(winner);
+          setTournamentWinner(finalMatch.winner);
           setFixtures([]); // Clear fixtures since tournament is complete
+          setCurrentTeams([]); // Clear current teams
 
           // Show winner alert with trophy emoji and match details
           Alert.alert(
             '🏆 Tournament Champion! 🏆',
-            `Congratulations!\n\n${winner} has won the tournament!\n\nFinal Match Result:\n${finalMatch.teamA} vs ${finalMatch.teamB}\nWinner: ${winner}${finalMatch.result ? '\n' + finalMatch.result : ''}`,
+            `Congratulations!\n\n${finalMatch.winner} has won the tournament!\n\nFinal Match Result:\n${finalMatch.teamA} vs ${finalMatch.teamB}\nWinner: ${finalMatch.winner}${finalMatch.result ? '\n' + finalMatch.result : ''}`,
             [
-              { 
-                text: 'View Match History',
-                onPress: () => router.push('/matchHistory')
-              },
               {
                 text: 'New Tournament',
                 onPress: handleReturnToRound1
@@ -225,62 +251,27 @@ const Fixtures = () => {
             ]
           );
           return;
-        } catch (error) {
-          console.error('Error processing final match:', error);
-          Alert.alert('Error', 'Failed to process tournament winner: ' + error.message);
-          return;
         }
       }
 
-      // Only proceed with round progression if we haven't reached the finals
+      // Generate next round fixtures only if we're not in the final round
       if (round < totalRounds) {
-        try {
-          console.log(`Processing round ${round} progression`);
-          
-          // Get winners from current round matches
-          const currentRoundMatches = completedMatches.filter(match => 
-            !match.teamA.includes('BYE') && !match.teamB.includes('BYE')
-          ).slice(-currentNonByeMatches.length);
-          
-          console.log('Current round matches:', currentRoundMatches);
+        const nextRoundFixtures = generateFixtures(allWinners);
+        console.log('Next round fixtures:', nextRoundFixtures);
 
-          // Get winners from matches
-          const roundWinners = currentRoundMatches.map(match => {
-            const winnerTeamEntry = Object.entries(teamNames).find(([_, name]) => name === match.winner);
-            if (!winnerTeamEntry) {
-              throw new Error(`Could not find team key for winner: ${match.winner}`);
-            }
-            return winnerTeamEntry[0];
-          });
+        // Update state and storage
+        await AsyncStorage.setItem('tournamentFixtures', JSON.stringify(nextRoundFixtures));
+        await AsyncStorage.setItem('currentRound', String(round + 1));
+        setFixtures(nextRoundFixtures);
+        setCurrentTeams(allWinners);
+        setRound(round + 1);
 
-          // Add bye team winners if any
-          const byeMatches = fixtures.filter(([_, teamB]) => teamB === 'BYE');
-          const byeWinners = byeMatches.map(([teamA]) => teamA);
-          const allWinners = [...roundWinners, ...byeWinners];
-
-          console.log('Round winners:', allWinners);
-
-          // Generate next round fixtures
-          const nextRoundFixtures = generateFixtures(allWinners);
-          console.log('Next round fixtures:', nextRoundFixtures);
-
-          // Update state and storage
-          await AsyncStorage.setItem('tournamentFixtures', JSON.stringify(nextRoundFixtures));
-          await AsyncStorage.setItem('currentRound', String(round + 1));
-          setFixtures(nextRoundFixtures);
-          setCurrentTeams(allWinners);
-          setRound(round + 1);
-
-          const nextRoundName = getRoundName(allWinners.length, round + 1);
-          Alert.alert(`Proceeding to ${nextRoundName}`, 
-            nextRoundFixtures.map(([teamA, teamB]) => 
-              `${teamNames[teamA]} vs ${teamB === 'BYE' ? 'BYE' : teamNames[teamB]}`
-            ).join('\n')
-          );
-        } catch (error) {
-          console.error(`Error in round ${round} progression:`, error);
-          Alert.alert('Error', `Failed to set up next round matches: ${error.message}`);
-        }
+        const nextRoundName = getRoundName(allWinners.length, round + 1);
+        Alert.alert(`Proceeding to ${nextRoundName}`, 
+          nextRoundFixtures.map(([teamA, teamB]) => 
+            `${teamNames[teamA]} vs ${teamB === 'BYE' ? 'BYE' : teamNames[teamB]}`
+          ).join('\n')
+        );
       }
     } catch (error) {
       console.error('Error in simulateWinners:', error);
@@ -294,6 +285,7 @@ const Fixtures = () => {
       setRound(1);
       setTournamentWinner(null);
       setCompletedMatches([]);
+      setFixtures([]);
       
       // Clear stored data
       await AsyncStorage.removeItem('matchHistory');
