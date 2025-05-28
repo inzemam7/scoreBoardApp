@@ -75,6 +75,11 @@ const MatchScreen = () => {
     // Add new state for run out popup
     const [showRunOutOptions, setShowRunOutOptions] = useState(false);
 
+    const [ws, setWs] = useState(null);
+    const [isConnected, setIsConnected] = useState(false);
+    const [wsAttempts, setWsAttempts] = useState(0);
+    const [esp32IP, setEsp32IP] = useState('YOUR_ESP32_IP'); // Add this state for ESP32 IP
+
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -145,6 +150,71 @@ const MatchScreen = () => {
         };
         fetchData();
     }, []);
+
+    // WebSocket connection
+    useEffect(() => {
+        const connectWebSocket = () => {
+            const socket = new WebSocket(`ws://${esp32IP}:81`);
+
+            socket.onopen = () => {
+                console.log('WebSocket Connected');
+                setIsConnected(true);
+                setWsAttempts(0);
+            };
+
+            socket.onclose = (e) => {
+                console.log(`WebSocket Disconnected (Code: ${e.code})`);
+                setIsConnected(false);
+                // Exponential backoff for reconnection
+                setTimeout(connectWebSocket, Math.min(5000 * (wsAttempts + 1), 30000));
+                setWsAttempts(prev => prev + 1);
+            };
+
+            socket.onerror = (error) => {
+                console.error('WebSocket Error:', error);
+            };
+
+            setWs(socket);
+        };
+
+        connectWebSocket();
+
+        return () => {
+            if (ws) {
+                ws.close();
+            }
+        };
+    }, [esp32IP]);
+
+    // Function to send match data
+    const sendMatchData = () => {
+        if (ws && isConnected) {
+            const matchData = {
+                type: 'cricket',
+                teamA: teamAName,
+                teamB: teamBName,
+                scoreA: `${inningsData[0].score}/${inningsData[0].wickets}`,
+                scoreB: `${inningsData[1].score}/${inningsData[1].wickets}`,
+                oversA: `${Math.floor(inningsData[0].balls / 6)}.${inningsData[0].balls % 6}`,
+                oversB: `${Math.floor(inningsData[1].balls / 6)}.${inningsData[1].balls % 6}`,
+                batter1: currentBatter1 ? { name: currentBatter1, runs: batterStats.batter1.runs, balls: batterStats.batter1.balls } : null,
+                batter2: currentBatter2 ? { name: currentBatter2, runs: batterStats.batter2.runs, balls: batterStats.batter2.balls } : null,
+                bowler: currentBowler ? { name: currentBowler, wickets: bowlerStats[currentBowler]?.wickets || 0, runs: bowlerStats[currentBowler]?.runs || 0, overs: `${Math.floor((bowlerStats[currentBowler]?.balls || 0) / 6)}.${(bowlerStats[currentBowler]?.balls || 0) % 6}` } : null,
+            };
+
+            if (currentInning === 2) {
+                matchData.runsRequired = target - currentData.score;
+                matchData.ballsLeft = (oversLimit * 6) - currentData.balls;
+            }
+
+            ws.send(JSON.stringify(matchData));
+        }
+    };
+
+    // Send data whenever relevant state changes
+    useEffect(() => {
+        sendMatchData();
+    }, [inningsData, currentInning, isConnected, currentBatter1, currentBatter2, currentBowler, batterStats, bowlerStats]);
 
     const handleToss = () => {
         if (isMatchOver) {

@@ -44,6 +44,12 @@ const FootballMatchscreen = () => {
   const [matchResult, setMatchResult] = useState(null);
   const [hasShownSaveModal, setHasShownSaveModal] = useState(false);
 
+  // Add WebSocket state
+  const [ws, setWs] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [wsAttempts, setWsAttempts] = useState(0);
+  const [esp32IP, setEsp32IP] = useState('YOUR_ESP32_IP'); // Add this state for ESP32 IP
+
   // Load team players data
   useEffect(() => {
     const loadTeamPlayers = async () => {
@@ -108,6 +114,66 @@ const FootballMatchscreen = () => {
 
     return () => clearInterval(interval);
   }, [isRunning, phase, addedTime]);
+
+  // WebSocket connection
+  useEffect(() => {
+    const connectWebSocket = () => {
+      const socket = new WebSocket(`ws://${esp32IP}:81`); // Dynamically set esp32IP
+
+      socket.onopen = () => {
+        console.log('WebSocket Connected');
+        setIsConnected(true);
+        setWsAttempts(0);
+      };
+
+      socket.onclose = (e) => {
+        console.log(`WebSocket Disconnected (Code: ${e.code})`);
+        setIsConnected(false);
+        // Exponential backoff for reconnection
+        setTimeout(connectWebSocket, Math.min(5000 * (wsAttempts + 1), 30000));
+        setWsAttempts(prev => prev + 1);
+      };
+
+      socket.onerror = (error) => {
+        console.error('WebSocket Error:', error);
+      };
+
+      setWs(socket);
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (ws) {
+        ws.close();
+      }
+    };
+  }, [esp32IP]);  // Add esp32IP to dependencies
+
+  // Function to send match data
+  const sendMatchData = () => {
+    if (ws && isConnected) {
+      const matchData = {
+        timer: getFormattedTime(timer),
+        teamA: parsedMatch.teamA.teamName,
+        teamB: parsedMatch.teamB.teamName,
+        scoreA: teamAScore,
+        scoreB: teamBScore,
+        goalScorers: goalHistory.map(goal => ({
+          team: goal.team,
+          scorer: goal.scorer,
+          time: Math.floor(goal.time / 60) + 1
+        }))
+      };
+      
+      ws.send(JSON.stringify(matchData));
+    }
+  };
+
+  // Send data whenever relevant state changes
+  useEffect(() => {
+    sendMatchData();
+  }, [timer, teamAScore, teamBScore, goalHistory, isConnected]);
 
   const handleGoalA = () => {
     setCurrentScoringTeam('A');
